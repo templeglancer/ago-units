@@ -1,5 +1,7 @@
 # AGO — Unit Compendium
 
+Live at **https://agocompendium.com** (GitHub Pages behind Cloudflare).
+
 A self-contained website displaying every unit in the AGO mod, with names,
 descriptions, and battle stats merged from the mod's data files.
 
