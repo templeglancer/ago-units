@@ -687,7 +687,7 @@ footer {
     <thead>
       <tr>
         <th data-k="name">Unit <span class="arrow"></span></th>
-        <th data-k="men" class="num">Men <span class="arrow"></span></th>
+        <th data-k="men" class="num" title="In-game soldier count at Huge unit size (data value &times;2.5)">Men <span class="arrow"></span></th>
         <th data-k="atk" class="num">Atk <span class="arrow"></span></th>
         <th data-k="chg" class="num hide-sm">Chg <span class="arrow"></span></th>
         <th data-k="msl" class="num">Msl <span class="arrow"></span></th>
@@ -706,11 +706,15 @@ footer {
   <div class="empty" id="empty" hidden>No units match these filters.</div>
 </main>
 
-<footer>Generated ${generated} from <code>export_descr_unit.txt</code> &amp; <code>export_units.txt</code> &middot; ${model.units.length} units &middot; rebuild with <code>node build.js</code></footer>
+<footer>Soldier counts shown at Huge unit size (game scales data values &times;2.5) &middot; Generated ${generated} from <code>export_descr_unit.txt</code> &amp; <code>export_units.txt</code> &middot; ${model.units.length} units &middot; rebuild with <code>node build.js</code></footer>
 
 <script>
 const UNITS = ${dataJson};
 const FACTIONS = ${factionsJson};
+// In-game soldier counts are the data-file numbers scaled by the unit-size
+// setting; this site shows Huge (x2.5), the scale the mod is balanced around.
+const SIZE_SCALE = 2.5;
+const inGame = (n) => Math.round(n * SIZE_SCALE);
 UNITS.forEach((u, i) => { u.id = i; u.def = u.armour + u.skill + u.shield; });
 
 const state = { q: '', faction: '', cat: '', sortKey: null, sortDir: 1, open: new Set() };
@@ -774,7 +778,7 @@ function rowHtml(u) {
   const def = u.def + ' <span class="def-split">(' + u.armour + '·' + u.skill + '·' + u.shield + ')</span>';
   const mounted = u.mount || u.extras > 0;
   const hp = mounted && u.hpMount > u.hp ? u.hp + '<span class="def-split">/' + u.hpMount + '</span>' : u.hp;
-  const men = u.extras ? u.men + '<span class="def-split">+' + u.extras + '</span>' : u.men;
+  const men = u.extras ? inGame(u.men) + '<span class="def-split">+' + inGame(u.extras) + '</span>' : inGame(u.men);
   const mor = u.lockMorale ? u.morale + '<span class="badge" title="Morale locked: this unit never routs">&#8734;</span>' : u.morale;
   const card = u.card ? '<img class="card" loading="lazy" alt="" src="' + u.card + '">' : '';
   return '<tr class="unit' + (state.open.has(u.id) ? ' open' : '') + '" data-id="' + u.id + '">' +
@@ -815,7 +819,9 @@ function detailHtml(u) {
   const rows = [];
   const add = (k, v) => { if (v !== null && v !== undefined && v !== '') rows.push('<tr><td>' + k + '</td><td>' + v + '</td></tr>'); };
   add('Faction', esc(u.faction));
-  add('Soldiers', u.men + (u.extras ? ' + ' + u.extras + ' engine/beast' : '') + ((u.mount || u.extras > 0) && u.hpMount > u.hp ? ' · mount/beast ' + u.hpMount + ' hp' : ''));
+  add('Soldiers', inGame(u.men) + (u.extras ? ' + ' + inGame(u.extras) + ' engine/beast' : '') +
+    ' <span class="dim">(' + u.men + (u.extras ? '+' + u.extras : '') + ' in data ×' + SIZE_SCALE + ')</span>' +
+    ((u.mount || u.extras > 0) && u.hpMount > u.hp ? ' · mount/beast ' + u.hpMount + ' hp' : ''));
   if (u.atk !== null) add('Melee', 'attack ' + u.atk + ', charge ' + u.chg + (u.meleeAttr.length ? ' · ' + u.meleeAttr.join(', ') : ''));
   if (u.msl !== null) add('Ranged', 'attack ' + u.msl + ', range ' + u.rng + ', ' + u.ammo + ' ammo' + (u.mslAttr.length ? ' · ' + u.mslAttr.join(', ') : ''));
   add('Defence', u.def + ' = armour ' + u.armour + ' + skill ' + u.skill + ' + shield ' + u.shield + (u.armourMat ? ' (' + u.armourMat + ')' : ''));
