@@ -14,6 +14,9 @@ const EDU_TXT = path.join(MOD_ROOT, 'data', 'export_descr_unit.txt');
 const EOP_SCRIPTS = path.join(MOD_ROOT, 'eopData', 'eopScripts');
 const PROJ_TXT = path.join(MOD_ROOT, 'data', 'descr_projectile.txt');
 const MOUNT_TXT = path.join(MOD_ROOT, 'data', 'descr_mount.txt');
+const EDB_TXT = path.join(MOD_ROOT, 'data', 'export_descr_buildings.txt');
+const BUILDINGS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_buildings.txt');
+const SM_FACTIONS_TXT = path.join(MOD_ROOT, 'data', 'descr_sm_factions.txt');
 const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
 const OUT_HTML = path.join(__dirname, 'index.html');
@@ -412,6 +415,102 @@ function parseMounts(file) {
   return out;
 }
 
+// ------------------------------------------------------------- recruitment
+
+// export_descr_buildings.txt: which building level trains which unit, with
+// pool size, replenish rate (units per turn) and experience bonus.
+function parseEdb(file) {
+  const entries = {};
+  if (!fs.existsSync(file)) return entries;
+  let chain = null;
+  let levels = [];
+  let curLevel = null;
+  let kind = '';
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    if (!t) continue;
+    let m;
+    if ((m = t.match(/^building\s+(\S+)/))) { chain = m[1]; levels = []; curLevel = null; continue; }
+    if (chain && (m = t.match(/^levels\s+(.+)$/))) { levels = m[1].trim().split(/\s+/); continue; }
+    const first = t.split(/\s+/)[0];
+    if (levels.includes(first) && /\brequires\b/.test(t)) {
+      curLevel = first;
+      const second = t.split(/\s+/)[1];
+      kind = second === 'castle' ? 'castle' : second === 'city' ? 'city' : '';
+      continue;
+    }
+    if (curLevel && (m = t.match(/^recruit_pool\s+"([^"]+)"\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+requires\s+(.*)$/))) {
+      const unit = m[1].toLowerCase();
+      const conds = m[6];
+      const facs = ((conds.match(/factions\s*\{([^}]*)\}/) || [])[1] || '')
+        .split(',').map((s) => s.trim()).filter(Boolean);
+      const hr = [...conds.matchAll(/(not\s+)?hidden_resource\s+(\S+)/g)]
+        .filter((x) => !x[1]).map((x) => x[2]);
+      const evAll = [...conds.matchAll(/(not\s+)?event_counter\s+(\S+)/g)];
+      if (evAll.some((x) => !x[1] && x[2] === 'is_the_ai')) continue; // AI-only pool
+      const ev = evAll.filter((x) => !x[1] && x[2] !== 'is_the_ai').map((x) => x[2]);
+      (entries[unit] = entries[unit] || []).push({
+        level: curLevel,
+        tier: levels.indexOf(curLevel) + 1,
+        of: levels.length,
+        kind,
+        rate: Number(m[3]),
+        max: Number(m[4]),
+        exp: Number(m[5]),
+        facs, hr, ev,
+      });
+    }
+  }
+  return entries;
+}
+
+// descr_sm_factions.txt: vanilla faction tag -> culture (building names are
+// culture-suffixed in export_buildings.txt).
+function parseFactionCultures(file) {
+  const map = {};
+  if (!fs.existsSync(file)) return map;
+  let faction = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    let m;
+    if ((m = t.match(/^faction\s+(\S+?),?\s*$/))) faction = m[1];
+    else if (faction && (m = t.match(/^culture\s+(\S+)/))) map[faction] = m[1];
+  }
+  return map;
+}
+
+const bnameCache = {};
+function buildingDisplayName(bnames, level, culture, owner) {
+  const lk = level.toLowerCase();
+  const cacheKey = `${lk}|${culture}|${owner}`;
+  if (bnameCache[cacheKey]) return bnameCache[cacheKey];
+  // A real display name; raw key-like values ("isengard_barracks_lvl3") are
+  // placeholders, not names.
+  const ok = (v) => v && !/^[a-z0-9_]+$/.test(v.trim()) && !/do not translate/i.test(v) && !/^\{/.test(v);
+  // Some text tags drop the level key's first token (tower_ecthelion -> {ecthelion_*});
+  // suffixes may be a faction tag (_france) or a culture (_northern_european).
+  const candidates = [lk];
+  if (lk.includes('_')) candidates.push(lk.split('_').slice(1).join('_'));
+  let name = null;
+  outer:
+  for (const cand of candidates) {
+    for (const suffix of [owner, culture]) {
+      if (!suffix) continue;
+      const v = bnames[`${cand}_${suffix}`.toLowerCase()];
+      if (ok(v)) { name = v; break outer; }
+    }
+    if (ok(bnames[cand])) { name = bnames[cand]; break; }
+    // any suffix variant the mod defines (skip _desc/_desc_short entries)
+    const prefix = `${cand}_`;
+    for (const key of Object.keys(bnames)) {
+      if (key.startsWith(prefix) && !key.includes('desc') && ok(bnames[key])) { name = bnames[key]; break outer; }
+    }
+  }
+  if (!name) name = level.replace(/_lvl\d+$/i, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  bnameCache[cacheKey] = name;
+  return name;
+}
+
 // --------------------------------------------------------------- EOP units
 // M2TWEOP (eopData/eopScripts) injects extra units at runtime. Active entries
 // in Units/EOPDU.lua either point at an EDU-format file under
@@ -482,10 +581,14 @@ function buildModel() {
   }
   const cardIndex = buildCardIndex();
   const portraitIndex = buildPortraitIndex();
+  const edb = parseEdb(EDB_TXT);
+  const bnames = parseExportUnits(BUILDINGS_TXT); // same {tag}text format
+  const cultures = parseFactionCultures(SM_FACTIONS_TXT);
   const units = [];
   let missingNames = 0;
   let missingCards = 0;
   let missingPortraits = 0;
+  let recruitable = 0;
 
   for (const u of [...edu, ...eop]) {
     const dict = (u.dict || u.type).trim();
@@ -496,6 +599,38 @@ function buildModel() {
     if (!card) missingCards += 1;
     const pic = portraitIndex[key] ? exportPortrait(portraitIndex[key], dict) : '';
     if (!pic) missingPortraits += 1;
+
+    // Recruitment: EDB entries are keyed by the EDU type string. Prefer the
+    // pools of the unit's own faction tag; merge duplicate building/rate rows
+    // that only differ by region or event conditions.
+    const owner = [u.era0, ...(u.ownership || [])].find((o) => o && o !== 'slave');
+    const culture = (owner && cultures[owner]) || '';
+    let pools = edb[u.type.trim().toLowerCase()] || [];
+    if (owner) {
+      const own = pools.filter((p) => p.facs.includes(owner));
+      if (own.length) pools = own;
+    }
+    const merged = new Map();
+    for (const p of pools) {
+      const k = `${p.level}|${p.rate}|${p.max}|${p.exp}`;
+      if (!merged.has(k)) {
+        merged.set(k, {
+          b: buildingDisplayName(bnames, p.level, culture, owner),
+          tier: p.tier, of: p.of, kind: p.kind,
+          rate: p.rate, max: p.max, exp: p.exp,
+          hr: new Set(p.hr), ev: new Set(p.ev), variants: 1,
+        });
+      } else {
+        const e = merged.get(k);
+        for (const h of p.hr) e.hr.add(h);
+        for (const x of p.ev) e.ev.add(x);
+        e.variants += 1;
+      }
+    }
+    const recruit = [...merged.values()]
+      .sort((a, b) => a.tier - b.tier || b.rate - a.rate)
+      .map((e) => ({ ...e, max: Math.round(e.max * 10) / 10, hr: [...e.hr].slice(0, 4), ev: [...e.ev].slice(0, 2) }));
+    if (recruit.length) recruitable += 1;
 
     // melee weapon = whichever of pri/sec is a melee strike; missile likewise
     let melee = null;
@@ -545,6 +680,7 @@ function buildModel() {
       formations: u.formations || [],
       moveSpeed: u.moveSpeed || 0,
       armourUg: u.armourUg || [],
+      recruit,
       eop: !!u.eop,
       card,
       pic,
@@ -578,7 +714,7 @@ function buildModel() {
   const factions = [...new Set(units.map((x) => x.faction))];
   return {
     units, factions, projectiles, mounts,
-    missingNames, missingCards, missingPortraits, eopCount: eop.length,
+    missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable,
   };
 }
 
@@ -1090,7 +1226,19 @@ function detailHtml(u) {
     add('Armour upgrades', '<a class="ref" data-ref="armour:' + u.id + '">' + u.armourUg.join(' \\u2192 ') + '</a> (' + (u.armourUg.length - 1) + ')');
   }
   if (u.engine) add('Engine', esc(u.engine.replace(/_/g, ' ')));
-  add('Recruitment', u.cost + ' gold · ' + u.upkeep + ' upkeep · ' + u.turns + (u.turns === 1 ? ' turn' : ' turns'));
+  add('Recruitment', u.cost + ' gold · ' + u.upkeep + ' upkeep · ' + u.turns + (u.turns === 1 ? ' turn' : ' turns') + ' to train');
+  if (u.recruit.length) {
+    const lines = u.recruit.map(r => {
+      const every = r.rate > 0 ? '+1 every ~' + Math.max(1, Math.round(1 / r.rate)) + ' turns' : 'no replenishment';
+      const conds = [];
+      if (r.hr.length) conds.push('region: ' + r.hr.join(', ').replace(/_/g, ' '));
+      if (r.ev.length) conds.push('event: ' + r.ev.join(', ').replace(/_/g, ' '));
+      return '<b>' + esc(r.b) + '</b> <span class="dim">(' + (r.kind ? r.kind + ', ' : '') + 'tier ' + r.tier + '/' + r.of + ')</span> — ' +
+        every + ', pool ' + r.max + (r.exp ? ', +' + r.exp + ' exp' : '') +
+        (conds.length ? ' <span class="dim">· ' + esc(conds.join(' · ')) + '</span>' : '');
+    });
+    add('Buildings', lines.join('<br>'));
+  }
   if (u.heat) add('Heat fatigue', '-' + u.heat);
   if (u.ground.length === 4) {
     const g = u.ground.map((v, i) => v ? ['scrub', 'sand', 'forest', 'snow'][i] + ' ' + (v > 0 ? '+' : '') + v : '').filter(Boolean).join(', ');
@@ -1272,6 +1420,7 @@ render();
 const model = buildModel();
 fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
 console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections (${model.eopCount} added from eopData).`);
+console.log(`${model.recruitable} units have building recruitment data.`);
 if (model.missingNames) console.log(`${model.missingNames} units had no entry in export_units.txt (internal name used).`);
 if (model.missingCards) console.log(`${model.missingCards} units had no card image in data/ui/units/mercs.`);
 if (model.missingPortraits) console.log(`${model.missingPortraits} units had no portrait in data/ui/unit_info/merc.`);

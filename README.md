@@ -53,6 +53,10 @@ This rewrites `index.html` in place. No dependencies are needed beyond Node.
 - Click any column header to sort (once = descending, twice = ascending, third click returns to faction grouping)
 - Click any unit row to expand its full description and complete stat breakdown
 - Badges: **AP** armour-piercing, **BP** body-piercing, **SP** spear bonus, **∞** morale-locked (never routs)
+- Recruitment buildings: the expanded view lists every building level that
+  trains the unit (from `export_descr_buildings.txt`) with its tier,
+  city/castle chain, pool size, replenish rate ("+1 every ~N turns"),
+  experience bonus, and region/event requirements
 - Reference cards: in the expanded view, the ammunition type, mount, and
   armour-upgrade levels are clickable — each opens a card with its game data
   (from `descr_projectile.txt` / `descr_mount.txt` / `armour_ug_levels`) and
