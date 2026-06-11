@@ -32,6 +32,9 @@ The site is generated from:
 - `../data/ui/units/mercs/#*.tga` — unit cards (converted to PNG and embedded at build time)
 - `../data/ui/unit_info/merc/*_info.tga` — large unit portraits (converted to
   PNG in `portraits/`; only changed files are reconverted)
+- `../data/world/maps/campaign/imperial_campaign/descr_mercenaries.txt` —
+  region-based mercenary pools (cost, replenish rate, regions, which factions
+  can hire)
 - `../eopData/eopScripts/Units/EOPDU.lua` + `Resources/Unit_Types/*.txt` —
   extra units injected at runtime by M2TWEOP (marked with an EOP badge;
   stat-identical `rootUnit` bodyguard clones are skipped)
@@ -57,6 +60,10 @@ This rewrites `index.html` in place. No dependencies are needed beyond Node.
   trains the unit (from `export_descr_buildings.txt`) with its tier,
   city/castle chain, pool size, replenish rate ("+1 every ~N turns"),
   experience bonus, and region/event requirements
+- Mercenary hire: field-hire pools (from `descr_mercenaries.txt`) with cost,
+  replenish range, pool size, the provinces where the unit can be hired, and
+  which factions may hire it; units with no recruitment source at all show an
+  Availability note (bodyguard / event / script) instead
 - Reference cards: in the expanded view, the ammunition type, mount, and
   armour-upgrade levels are clickable — each opens a card with its game data
   (from `descr_projectile.txt` / `descr_mount.txt` / `armour_ug_levels`) and

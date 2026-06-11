@@ -17,6 +17,7 @@ const MOUNT_TXT = path.join(MOD_ROOT, 'data', 'descr_mount.txt');
 const EDB_TXT = path.join(MOD_ROOT, 'data', 'export_descr_buildings.txt');
 const BUILDINGS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_buildings.txt');
 const SM_FACTIONS_TXT = path.join(MOD_ROOT, 'data', 'descr_sm_factions.txt');
+const MERC_TXT = path.join(MOD_ROOT, 'data', 'world', 'maps', 'campaign', 'imperial_campaign', 'descr_mercenaries.txt');
 const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
 const OUT_HTML = path.join(__dirname, 'index.html');
@@ -465,18 +466,52 @@ function parseEdb(file) {
 }
 
 // descr_sm_factions.txt: vanilla faction tag -> culture (building names are
-// culture-suffixed in export_buildings.txt).
+// culture-suffixed in export_buildings.txt) and religion (mercenary pools are
+// gated by religion).
 function parseFactionCultures(file) {
-  const map = {};
+  const map = { culture: {}, religion: {} };
   if (!fs.existsSync(file)) return map;
   let faction = null;
   for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
     const t = raw.split(';')[0].trim();
     let m;
     if ((m = t.match(/^faction\s+(\S+?),?\s*$/))) faction = m[1];
-    else if (faction && (m = t.match(/^culture\s+(\S+)/))) map[faction] = m[1];
+    else if (faction && (m = t.match(/^culture\s+(\S+)/))) map.culture[faction] = m[1];
+    else if (faction && (m = t.match(/^religion\s+(\S+)/))) map.religion[faction] = m[1];
   }
   return map;
+}
+
+// descr_mercenaries.txt: region-based pools of mercenaries hired in the field
+// by an army's captain. Availability is gated by the hiring faction's religion
+// tag and sometimes by an event counter.
+function parseMercs(file, knownReligions) {
+  const entries = {};
+  if (!fs.existsSync(file)) return entries;
+  let regions = [];
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    if (!t) continue;
+    let m;
+    if (/^pool\s+/.test(t)) { regions = []; continue; }
+    if ((m = t.match(/^regions\s+(.+)$/))) { regions = m[1].trim().split(/\s+/); continue; }
+    if ((m = t.match(/^unit\s+(.+?),?\s+exp\s+(\d+)\s+cost\s+(\d+)\s+replenish\s+([\d.]+)\s*-\s*([\d.]+)\s+max\s+(\d+)\s+initial\s+(\d+)(.*)$/))) {
+      const unit = m[1].trim().toLowerCase();
+      const rest = m[8];
+      let religions = ((rest.match(/religions\s*\{([^}]*)\}/) || [])[1] || '').trim().split(/\s+/).filter(Boolean);
+      let events = ((rest.match(/events\s*\{([^}]*)\}/) || [])[1] || '').trim().split(/\s+/).filter(Boolean);
+      // mod typo guard: religion tags written inside an events block
+      if (events.length && events.every((e) => knownReligions.has(e))) { religions = events; events = []; }
+      const rates = [Number(m[4]), Number(m[5])].sort((a, b) => a - b);
+      (entries[unit] = entries[unit] || []).push({
+        regions, exp: Number(m[2]), cost: Number(m[3]),
+        repMin: rates[0], repMax: rates[1],
+        max: Number(m[6]), initial: Number(m[7]),
+        religions, events,
+      });
+    }
+  }
+  return entries;
 }
 
 const bnameCache = {};
@@ -583,12 +618,42 @@ function buildModel() {
   const portraitIndex = buildPortraitIndex();
   const edb = parseEdb(EDB_TXT);
   const bnames = parseExportUnits(BUILDINGS_TXT); // same {tag}text format
-  const cultures = parseFactionCultures(SM_FACTIONS_TXT);
+  const facInfo = parseFactionCultures(SM_FACTIONS_TXT);
+  const cultures = facInfo.culture;
+  const mercAll = parseMercs(MERC_TXT, new Set(Object.values(facInfo.religion)));
+
+  // religion tag -> faction display names able to hire that mercenary
+  const relFactions = {};
+  for (const [tag, rel] of Object.entries(facInfo.religion)) {
+    const disp = ownerMap[tag];
+    if (!disp) continue;
+    (relFactions[rel] = relFactions[rel] || new Set()).add(disp);
+  }
+  const allHirers = new Set();
+  for (const s of Object.values(relFactions)) for (const f of s) allHirers.add(f);
+  const hirersLabel = (religions) => {
+    if (!religions.length) return '';
+    const set = new Set();
+    for (const r of religions) for (const f of relFactions[r] || []) set.add(f);
+    if (!set.size) return '';
+    const missing = [...allHirers].filter((f) => !set.has(f)).sort();
+    if (!missing.length) return 'all factions';
+    if (missing.length <= 3) return 'all except ' + missing.join(', ');
+    return [...set].sort().join(', ');
+  };
+  // e.g. turks_allied_normans -> the two factions behind the vanilla tags
+  const prettyEvent = (e) => {
+    const m = e.match(/^([a-z]+)_allied_([a-z]+)$/);
+    if (m && ownerMap[m[1]] && ownerMap[m[2]]) return 'alliance: ' + ownerMap[m[1]] + ' & ' + ownerMap[m[2]];
+    return e.replace(/_/g, ' ');
+  };
+
   const units = [];
   let missingNames = 0;
   let missingCards = 0;
   let missingPortraits = 0;
   let recruitable = 0;
+  let mercCount = 0;
 
   for (const u of [...edu, ...eop]) {
     const dict = (u.dict || u.type).trim();
@@ -631,6 +696,26 @@ function buildModel() {
       .sort((a, b) => a.tier - b.tier || b.rate - a.rate)
       .map((e) => ({ ...e, max: Math.round(e.max * 10) / 10, hr: [...e.hr].slice(0, 4), ev: [...e.ev].slice(0, 2) }));
     if (recruit.length) recruitable += 1;
+
+    // Mercenary pools: merge entries with identical terms, union their regions.
+    const mPools = mercAll[u.type.trim().toLowerCase()] || [];
+    const mMerged = new Map();
+    for (const p of mPools) {
+      const k = [p.cost, p.repMin, p.repMax, p.max, p.initial, p.exp, p.religions.join(','), p.events.join(',')].join('|');
+      if (!mMerged.has(k)) mMerged.set(k, { ...p, regions: new Set(p.regions) });
+      else for (const r of p.regions) mMerged.get(k).regions.add(r);
+    }
+    const merc = [...mMerged.values()]
+      .sort((a, b) => a.cost - b.cost)
+      .map((e) => ({
+        cost: e.cost, exp: e.exp, max: e.max, initial: e.initial,
+        tMin: e.repMax > 0 ? Math.max(1, Math.round(1 / e.repMax)) : 0,
+        tMax: e.repMin > 0 ? Math.round(1 / e.repMin) : 0,
+        regions: [...e.regions].map((r) => r.replace(/_Province$/i, '').replace(/_/g, ' ')).sort(),
+        hirers: hirersLabel(e.religions),
+        ev: e.events.map(prettyEvent),
+      }));
+    if (merc.length) mercCount += 1;
 
     // melee weapon = whichever of pri/sec is a melee strike; missile likewise
     let melee = null;
@@ -681,6 +766,7 @@ function buildModel() {
       moveSpeed: u.moveSpeed || 0,
       armourUg: u.armourUg || [],
       recruit,
+      merc,
       eop: !!u.eop,
       card,
       pic,
@@ -714,7 +800,7 @@ function buildModel() {
   const factions = [...new Set(units.map((x) => x.faction))];
   return {
     units, factions, projectiles, mounts,
-    missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable,
+    missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
 
@@ -1239,6 +1325,30 @@ function detailHtml(u) {
     });
     add('Buildings', lines.join('<br>'));
   }
+  if (u.merc.length) {
+    const lines = u.merc.map(r => {
+      const every = r.tMax
+        ? '+1 every ~' + (r.tMin === r.tMax ? r.tMin : r.tMin + '\\u2013' + r.tMax) + ' turns'
+        : 'no replenishment';
+      const SHOW = 8;
+      const regs = r.regions.length > SHOW
+        ? '<span title="' + esc(r.regions.join(', ')) + '">' + esc(r.regions.slice(0, SHOW).join(', ')) + ' +' + (r.regions.length - SHOW) + ' more</span>'
+        : esc(r.regions.join(', '));
+      const conds = [];
+      if (r.hirers) conds.push('for: ' + esc(r.hirers));
+      if (r.ev.length) conds.push('event: ' + esc(r.ev.join(', ')));
+      return '<b>' + r.cost + ' gold</b> — ' + every + ', pool ' + r.max + (r.initial ? ' (starts at ' + r.initial + ')' : '') +
+        (r.exp ? ', +' + r.exp + ' exp' : '') +
+        '<br><span class="dim">in: ' + regs + (conds.length ? ' · ' + conds.join(' · ') : '') + '</span>';
+    });
+    add('Mercenary hire', lines.join('<br>'));
+  }
+  if (!u.recruit.length && !u.merc.length) {
+    const why = u.eop ? 'No building pool — granted by campaign scripts (M2TWEOP).'
+      : u.attributes.includes('general_unit') ? 'Bodyguard — arrives with new generals and family members, not recruited.'
+      : 'Not recruited from buildings — granted by events or campaign scripts.';
+    add('Availability', '<span class="dim">' + why + '</span>');
+  }
   if (u.heat) add('Heat fatigue', '-' + u.heat);
   if (u.ground.length === 4) {
     const g = u.ground.map((v, i) => v ? ['scrub', 'sand', 'forest', 'snow'][i] + ' ' + (v > 0 ? '+' : '') + v : '').filter(Boolean).join(', ');
@@ -1420,7 +1530,7 @@ render();
 const model = buildModel();
 fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
 console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections (${model.eopCount} added from eopData).`);
-console.log(`${model.recruitable} units have building recruitment data.`);
+console.log(`${model.recruitable} units have building recruitment data; ${model.mercCount} have mercenary pools.`);
 if (model.missingNames) console.log(`${model.missingNames} units had no entry in export_units.txt (internal name used).`);
 if (model.missingCards) console.log(`${model.missingCards} units had no card image in data/ui/units/mercs.`);
 if (model.missingPortraits) console.log(`${model.missingPortraits} units had no portrait in data/ui/unit_info/merc.`);
