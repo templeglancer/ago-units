@@ -12,6 +12,8 @@ const MOD_ROOT = path.join(__dirname, '..');
 const UNITS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_units.txt');
 const EDU_TXT = path.join(MOD_ROOT, 'data', 'export_descr_unit.txt');
 const EOP_SCRIPTS = path.join(MOD_ROOT, 'eopData', 'eopScripts');
+const PROJ_TXT = path.join(MOD_ROOT, 'data', 'descr_projectile.txt');
+const MOUNT_TXT = path.join(MOD_ROOT, 'data', 'descr_mount.txt');
 const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
 const OUT_HTML = path.join(__dirname, 'index.html');
@@ -303,6 +305,7 @@ function parseEduText(text, startSection) {
       case 'move_speed_mod': u.moveSpeed = Number(value); break;
       case 'ownership': u.ownership = splitCsv(value); break;
       case 'era 0': u.era0 = splitCsv(value)[0]; break;
+      case 'armour_ug_levels': u.armourUg = splitCsv(value).map(Number); break;
       case 'stat_health': {
         const p = splitCsv(value);
         u.hp = Number(p[0]);
@@ -344,6 +347,69 @@ function parseEduText(text, startSection) {
   }
   push();
   return units;
+}
+
+// ------------------------------------------------------ reference data
+
+// descr_projectile.txt: the ammunition fired by every missile weapon.
+function parseProjectiles(file) {
+  const out = {};
+  if (!fs.existsSync(file)) return out;
+  let p = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const line = raw.split(';')[0].trimEnd();
+    if (!line.trim()) continue;
+    const head = line.match(/^projectile\s+(\S+)/);
+    if (head) { p = out[head[1].toLowerCase()] = { name: head[1], flags: [] }; continue; }
+    if (!p) continue;
+    const kv = line.trim().match(/^(\S+)\s*(.*)$/);
+    if (!kv) continue;
+    const v = kv[2].trim();
+    switch (kv[1].toLowerCase()) {
+      case 'damage': p.damage = Number(v); break;
+      case 'mass': p.mass = Number(v); break;
+      case 'accuracy_vs_units': p.accuracy = Number(v); break;
+      case 'velocity': p.velocity = v.split(/\s+/).map(Number); break;
+      case 'fiery': p.flags.push('fire'); break;
+      case 'body_piercing': p.flags.push('body-piercing'); break;
+      case 'area_effect': p.flags.push('area effect'); break;
+      default: break;
+    }
+  }
+  // name-derived specials (matches the in-game tooltips driven by EOP)
+  for (const p2 of Object.values(out)) {
+    const n = p2.name.toLowerCase();
+    if (n.includes('poison')) p2.flags.push('poison');
+    if (n.includes('silverthorn')) p2.flags.push('silverthorn');
+    if (n.includes('multi')) p2.flags.push('splitshot');
+  }
+  return out;
+}
+
+// descr_mount.txt: every horse/warg/beast design ridden in the mod.
+function parseMounts(file) {
+  const out = {};
+  if (!fs.existsSync(file)) return out;
+  let m = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const line = raw.split(';')[0].trimEnd();
+    if (!line.trim()) continue;
+    const head = line.match(/^type\s+(.+)$/);
+    if (head) { m = out[head[1].trim().toLowerCase()] = { name: head[1].trim(), riders: 1 }; continue; }
+    if (!m) continue;
+    const kv = line.trim().match(/^(\S+)\s+(.*)$/);
+    if (!kv) continue;
+    const v = kv[2].trim();
+    switch (kv[1].toLowerCase()) {
+      case 'class': m.class = v; break;
+      case 'mass': m.mass = Number(v); break;
+      case 'radius': m.radius = Number(v); break;
+      case 'height': m.height = Number(v); break;
+      case 'riders': m.riders = Number(v); break;
+      default: break;
+    }
+  }
+  return out;
 }
 
 // --------------------------------------------------------------- EOP units
@@ -478,6 +544,7 @@ function buildModel() {
       vsMounts: u.mountEffect || '',
       formations: u.formations || [],
       moveSpeed: u.moveSpeed || 0,
+      armourUg: u.armourUg || [],
       eop: !!u.eop,
       card,
       pic,
@@ -492,8 +559,27 @@ function buildModel() {
   const order = [...new Set(units.map((x) => x.faction))];
   units.sort((a, b) => order.indexOf(a.faction) - order.indexOf(b.faction));
 
+  // Reference data, trimmed to entries actually used by a unit.
+  const projAll = parseProjectiles(PROJ_TXT);
+  const mountAll = parseMounts(MOUNT_TXT);
+  const projectiles = {};
+  const mounts = {};
+  for (const u of units) {
+    if (u.mslName) {
+      const k = u.mslName.toLowerCase();
+      if (projAll[k]) projectiles[k] = projAll[k];
+    }
+    if (u.mount) {
+      const k = u.mount.toLowerCase();
+      if (mountAll[k]) mounts[k] = mountAll[k];
+    }
+  }
+
   const factions = [...new Set(units.map((x) => x.faction))];
-  return { units, factions, missingNames, missingCards, missingPortraits, eopCount: eop.length };
+  return {
+    units, factions, projectiles, mounts,
+    missingNames, missingCards, missingPortraits, eopCount: eop.length,
+  };
 }
 
 // --------------------------------------------------------------------- html
@@ -501,6 +587,8 @@ function buildModel() {
 function buildHtml(model) {
   const dataJson = JSON.stringify(model.units);
   const factionsJson = JSON.stringify(model.factions);
+  const projJson = JSON.stringify(model.projectiles);
+  const mountJson = JSON.stringify(model.mounts);
   const generated = new Date().toISOString().slice(0, 10);
 
   return `<!DOCTYPE html>
@@ -709,6 +797,95 @@ tr.detail td {
   padding-top: 4px;
 }
 .empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 30px; font-size: 17px; }
+a.ref {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--accent);
+  cursor: pointer;
+}
+a.ref:hover { background: rgba(122,31,31,.08); }
+#ref-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(43,33,24,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#ref-modal[hidden] { display: none; }
+.ref-box {
+  background: var(--parchment);
+  border: 2px solid var(--line-dark);
+  border-radius: 4px;
+  box-shadow: 0 8px 30px rgba(30,20,5,.5);
+  max-width: 460px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 18px 22px 20px;
+}
+.ref-box h2 {
+  font-family: var(--display);
+  font-size: 19px;
+  letter-spacing: .08em;
+  color: var(--accent);
+  margin: 0 0 2px;
+  border-bottom: 2px double var(--line-dark);
+  padding-bottom: 6px;
+}
+.ref-box .ref-kind {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.ref-box table { border-collapse: collapse; width: 100%; margin: 10px 0 4px; }
+.ref-box table td { border: none; border-bottom: 1px dotted var(--line); padding: 3px 8px 3px 0; font-size: 14.5px; }
+.ref-box table td:first-child {
+  font-family: var(--display);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  width: 130px;
+}
+.ref-box .ref-note { font-style: italic; color: var(--ink-soft); font-size: 13.5px; margin: 8px 0 0; }
+.ref-box .ref-users { margin: 10px 0 0; }
+.ref-box .ref-users h3 {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 4px;
+}
+.ref-box .ref-users a {
+  display: inline-block;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--line-dark);
+  margin: 0 10px 3px 0;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.ref-box .ref-users a:hover { color: var(--accent); }
+.ref-box .ref-close {
+  float: right;
+  font-family: var(--display);
+  font-size: 13px;
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  background: var(--parchment-dark);
+  color: var(--ink-soft);
+  padding: 1px 8px;
+  cursor: pointer;
+  margin-left: 10px;
+}
+tr.unit.flash { animation: rowflash 1.6s ease-out; }
+@keyframes rowflash { 0% { background: #d8b86a; } 100% { background: var(--row-alt); } }
 footer {
   text-align: center;
   font-style: italic;
@@ -770,11 +947,15 @@ footer {
   <div class="empty" id="empty" hidden>No units match these filters.</div>
 </main>
 
+<div id="ref-modal" hidden><div class="ref-box" role="dialog"></div></div>
+
 <footer>Soldier counts shown at Huge unit size (game scales data values &times;2.5) &middot; Generated ${generated} from <code>export_descr_unit.txt</code> &amp; <code>export_units.txt</code> &middot; ${model.units.length} units &middot; rebuild with <code>node build.js</code></footer>
 
 <script>
 const UNITS = ${dataJson};
 const FACTIONS = ${factionsJson};
+const PROJ = ${projJson};
+const MOUNTS = ${mountJson};
 // In-game soldier counts are the data-file numbers scaled by the unit-size
 // setting; this site shows Huge (x2.5), the scale the mod is balanced around.
 const SIZE_SCALE = 2.5;
@@ -889,13 +1070,25 @@ function detailHtml(u) {
     ' <span class="dim">(' + u.men + (u.extras ? '+' + u.extras : '') + ' in data ×' + SIZE_SCALE + ')</span>' +
     ((u.mount || u.extras > 0) && u.hpMount > u.hp ? ' · mount/beast ' + u.hpMount + ' hp' : ''));
   if (u.atk !== null) add('Melee', 'attack ' + u.atk + ', charge ' + u.chg + (u.meleeAttr.length ? ' · ' + u.meleeAttr.join(', ') : ''));
-  if (u.msl !== null) add('Ranged', 'attack ' + u.msl + ', range ' + u.rng + ', ' + u.ammo + ' ammo' + (u.mslAttr.length ? ' · ' + u.mslAttr.join(', ') : ''));
+  if (u.msl !== null) {
+    const pk = u.mslName ? u.mslName.toLowerCase() : '';
+    const ammoLink = PROJ[pk]
+      ? ' · <a class="ref" data-ref="proj:' + pk + '">' + esc(u.mslName) + '</a>'
+      : (u.mslName ? ' · ' + esc(u.mslName) : '');
+    add('Ranged', 'attack ' + u.msl + ', range ' + u.rng + ', ' + u.ammo + ' ammo' + (u.mslAttr.length ? ' · ' + u.mslAttr.join(', ') : '') + ammoLink);
+  }
   add('Defence', u.def + ' = armour ' + u.armour + ' + skill ' + u.skill + ' + shield ' + u.shield + (u.armourMat ? ' (' + u.armourMat + ')' : ''));
   add('Morale', u.morale + (u.lockMorale ? ' (locked — never routs)' : '') + ' · ' + u.discipline + ' · ' + u.training.replace(/_/g, ' '));
   if (u.vsMounts) add('Vs mounts', esc(u.vsMounts));
   if (u.formations.length) add('Formations', u.formations.map(f => f.replace(/_/g, ' ')).join(', '));
   if (u.moveSpeed && u.moveSpeed !== 1) add('Move speed', '\\u00D7' + u.moveSpeed);
-  if (u.mount) add('Mount', esc(u.mount));
+  if (u.mount) {
+    const mk = u.mount.toLowerCase();
+    add('Mount', MOUNTS[mk] ? '<a class="ref" data-ref="mount:' + mk + '">' + esc(u.mount) + '</a>' : esc(u.mount));
+  }
+  if (u.armourUg.length > 1) {
+    add('Armour upgrades', '<a class="ref" data-ref="armour:' + u.id + '">' + u.armourUg.join(' \\u2192 ') + '</a> (' + (u.armourUg.length - 1) + ')');
+  }
   if (u.engine) add('Engine', esc(u.engine.replace(/_/g, ' ')));
   add('Recruitment', u.cost + ' gold · ' + u.upkeep + ' upkeep · ' + u.turns + (u.turns === 1 ? ' turn' : ' turns'));
   if (u.heat) add('Heat fatigue', '-' + u.heat);
@@ -979,6 +1172,76 @@ document.querySelector('thead').addEventListener('click', (e) => {
   }
   render();
 });
+// ---- Reference module: ammunition / mounts / armour upgrades ----
+const refModal = document.getElementById('ref-modal');
+const refBox = refModal.querySelector('.ref-box');
+
+function refRow(k, v) { return '<tr><td>' + k + '</td><td>' + v + '</td></tr>'; }
+
+function refUsers(title, list) {
+  if (!list.length) return '';
+  return '<div class="ref-users"><h3>' + title + ' (' + list.length + ')</h3>' +
+    list.map(u => '<a class="ref-unit" data-id="' + u.id + '">' + esc(u.name) + '</a>').join('') + '</div>';
+}
+
+function openRef(kind, key) {
+  let html = '<button class="ref-close">Close</button>';
+  if (kind === 'proj') {
+    const p = PROJ[key];
+    if (!p) return;
+    html += '<span class="ref-kind">Ammunition</span><h2>' + esc(p.name) + '</h2><table>';
+    if (p.damage) html += refRow('Bonus damage', '+' + p.damage);
+    if (p.velocity) html += refRow('Velocity', p.velocity.join('\\u2013') + ' m/s');
+    if (p.accuracy !== undefined) html += refRow('Scatter', p.accuracy + ' (lower is more accurate)');
+    if (p.mass) html += refRow('Mass', p.mass);
+    if (p.flags.length) html += refRow('Traits', p.flags.join(', '));
+    html += '</table>';
+    html += '<p class="ref-note">Heavier, faster missiles keep more punch at range; fire, poison and silverthorn shots carry the effects their name promises.</p>';
+    html += refUsers('Fired by', UNITS.filter(u => u.mslName && u.mslName.toLowerCase() === key));
+  } else if (kind === 'mount') {
+    const m = MOUNTS[key];
+    if (!m) return;
+    html += '<span class="ref-kind">Mount</span><h2>' + esc(m.name) + '</h2><table>';
+    if (m.class) html += refRow('Class', m.class + ' (mount_effect bonuses key off this)');
+    if (m.mass) html += refRow('Mass', m.mass + ' (collision weight when charging)');
+    if (m.radius) html += refRow('Size', 'radius ' + m.radius + (m.height ? ', height ' + m.height : '') + ' m');
+    if (m.riders > 1) html += refRow('Riders', m.riders);
+    html += '</table>';
+    html += refUsers('Ridden by', UNITS.filter(u => u.mount && u.mount.toLowerCase() === key));
+  } else if (kind === 'armour') {
+    const u = UNITS[Number(key)];
+    if (!u) return;
+    html += '<span class="ref-kind">Armour upgrades</span><h2>' + esc(u.name) + '</h2><table>';
+    html += refRow('Levels', u.armourUg.join(' \\u2192 '));
+    html += refRow('Upgrades', (u.armourUg.length - 1) + ' (+1 armour each)');
+    html += '</table>';
+    html += '<p class="ref-note">Retraining in a settlement with a high enough tier of smith raises the unit through these armour levels: each step adds +1 to the armour stat (and often a more armoured look). The first number is the level the unit is recruited at.</p>';
+  }
+  refBox.innerHTML = html;
+  refModal.hidden = false;
+}
+
+function jumpToUnit(id) {
+  refModal.hidden = true;
+  state.q = ''; state.faction = ''; state.cat = ''; state.sortKey = null;
+  document.getElementById('q').value = '';
+  document.getElementById('faction').value = '';
+  for (const x of document.querySelectorAll('.catbtns button')) x.classList.toggle('active', x.dataset.cat === '');
+  state.open.add(Number(id));
+  render();
+  const row = document.querySelector('tr.unit[data-id="' + id + '"]');
+  if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
+}
+
+document.addEventListener('click', (e) => {
+  const ref = e.target.closest('a.ref');
+  if (ref) { const [kind, key] = ref.dataset.ref.split(':'); openRef(kind, key); return; }
+  const unitLink = e.target.closest('a.ref-unit');
+  if (unitLink) { jumpToUnit(unitLink.dataset.id); return; }
+  if (e.target.closest('.ref-close') || (e.target === refModal)) refModal.hidden = true;
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') refModal.hidden = true; });
+
 // Portrait failed to load (portraits/ folder absent) -> swap in the embedded card.
 document.getElementById('rows').addEventListener('error', (e) => {
   const img = e.target;

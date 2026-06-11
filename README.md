@@ -53,4 +53,8 @@ This rewrites `index.html` in place. No dependencies are needed beyond Node.
 - Click any column header to sort (once = descending, twice = ascending, third click returns to faction grouping)
 - Click any unit row to expand its full description and complete stat breakdown
 - Badges: **AP** armour-piercing, **BP** body-piercing, **SP** spear bonus, **∞** morale-locked (never routs)
+- Reference cards: in the expanded view, the ammunition type, mount, and
+  armour-upgrade levels are clickable — each opens a card with its game data
+  (from `descr_projectile.txt` / `descr_mount.txt` / `armour_ug_levels`) and
+  cross-links to every unit sharing it
 - Def column shows total (armour · defence skill · shield)
