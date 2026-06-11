@@ -16,11 +16,12 @@ without the folder the page falls back to system serif fonts.
 
 Two options:
 
-- **Quick** — send `index.html` alone (~5.5 MB). Everything works; expanded
-  units show the small unit card.
-- **Full** — send `index.html` together with the `portraits/` folder (~64 MB),
-  or host both on GitHub Pages / Netlify. Expanded units then show the large
-  in-game unit portrait, falling back to the card automatically if a portrait
+- **Quick** — send `index.html` alone (~1.5 MB). All data, search, filters and
+  comparison work; unit images are simply absent.
+- **Full** — send `index.html` together with the `cards/` folder (~4 MB) and,
+  optionally, the `portraits/` folder (~73 MB), or host everything on GitHub
+  Pages / Netlify. Cards appear in the table rows; expanded units show the
+  large in-game portrait, falling back to the card automatically if a portrait
   is missing.
 
 ## Rebuilding after a mod update
@@ -29,7 +30,8 @@ The site is generated from:
 
 - `../data/text/export_units.txt` — unit names and descriptions
 - `../data/export_descr_unit.txt` — unit stats
-- `../data/ui/units/mercs/#*.tga` — unit cards (converted to PNG and embedded at build time)
+- `../data/ui/units/mercs/#*.tga` — unit cards (converted to PNG in `cards/`;
+  only changed files are reconverted)
 - `../data/ui/unit_info/merc/*_info.tga` — large unit portraits (converted to
   PNG in `portraits/`; only changed files are reconverted)
 - `../data/world/maps/campaign/imperial_campaign/descr_mercenaries.txt` —
@@ -72,3 +74,8 @@ This rewrites `index.html` in place. No dependencies are needed beyond Node.
 - Deep links: opening a unit puts `#unit-slug` in the URL, and every expanded
   view has a "copy link" action — `https://agocompendium.com/#uruk-hai-infantry`
   opens the site scrolled to that unit with its details expanded
+- Side-by-side comparison: a "compare" action in each expanded view pins up to
+  four units to a bottom bar; the comparison table highlights the best value in
+  each row (lowest for cost, upkeep, turns and heat)
+- Mobile layout: narrow screens keep the six key columns (Unit, Men, Atk, Msl,
+  Def, Cost) and show everything else in the expanded view

@@ -22,6 +22,7 @@ const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
 const OUT_HTML = path.join(__dirname, 'index.html');
 const OUT_PORTRAITS = path.join(__dirname, 'portraits');
+const OUT_CARDS = path.join(__dirname, 'cards');
 
 // ------------------------------------------------------------- TGA -> PNG
 
@@ -123,16 +124,6 @@ function buildCardIndex() {
   return index;
 }
 
-function cardDataUri(file) {
-  try {
-    const tga = decodeTga(fs.readFileSync(file));
-    if (!tga) return '';
-    return 'data:image/png;base64,' + encodePng(tga).toString('base64');
-  } catch {
-    return '';
-  }
-}
-
 function buildPortraitIndex() {
   const index = {};
   if (!fs.existsSync(PORTRAIT_DIR)) return index;
@@ -143,25 +134,28 @@ function buildPortraitIndex() {
   return index;
 }
 
-// Converts <dict>_info.tga to portraits/<dict>.png (skipped when up to date).
+// Converts a TGA to <outDir>/<dict>.png (skipped when up to date).
 // Returns the relative href, or '' on failure.
-function exportPortrait(tgaFile, dict) {
+function exportImage(tgaFile, dict, outDir, hrefBase) {
   const safe = dict.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-  const outFile = path.join(OUT_PORTRAITS, safe + '.png');
-  const href = 'portraits/' + safe + '.png';
+  const outFile = path.join(outDir, safe + '.png');
+  const href = hrefBase + '/' + safe + '.png';
   try {
     if (fs.existsSync(outFile) && fs.statSync(outFile).mtimeMs >= fs.statSync(tgaFile).mtimeMs) {
       return href;
     }
     const tga = decodeTga(fs.readFileSync(tgaFile));
     if (!tga) return '';
-    fs.mkdirSync(OUT_PORTRAITS, { recursive: true });
+    fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(outFile, encodePng(tga));
     return href;
   } catch {
     return '';
   }
 }
+
+const exportPortrait = (tgaFile, dict) => exportImage(tgaFile, dict, OUT_PORTRAITS, 'portraits');
+const exportCard = (tgaFile, dict) => exportImage(tgaFile, dict, OUT_CARDS, 'cards');
 
 // ---------------------------------------------------------------- names file
 
@@ -671,7 +665,7 @@ function buildModel() {
     const key = dict.toLowerCase();
     const name = names[key] || u.type;
     if (!names[key]) missingNames += 1;
-    const card = cardIndex[key] ? cardDataUri(cardIndex[key]) : '';
+    const card = cardIndex[key] ? exportCard(cardIndex[key], dict) : '';
     if (!card) missingCards += 1;
     const pic = portraitIndex[key] ? exportPortrait(portraitIndex[key], dict) : '';
     if (!pic) missingPortraits += 1;
@@ -931,7 +925,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 12px 14px 60px; }
 table { width: 100%; border-collapse: collapse; }
 thead th {
   position: sticky;
-  top: 49px;
+  top: var(--ctrlh, 49px);
   z-index: 10;
   font-family: var(--display);
   font-size: 11.5px;
@@ -1118,6 +1112,72 @@ a.ref:hover { background: rgba(122,31,31,.08); }
   cursor: pointer;
   margin-left: 10px;
 }
+#cmp-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  background: var(--parchment-dark);
+  border-top: 2px solid var(--line-dark);
+  box-shadow: 0 -2px 8px rgba(60,40,10,.25);
+  font-size: 14.5px;
+}
+#cmp-bar .cmp-label {
+  font-family: var(--display);
+  font-size: 11.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+#cmp-bar .pin {
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  background: #fbf6e7;
+  padding: 2px 8px;
+  margin-right: 6px;
+}
+#cmp-bar .pin a { cursor: pointer; color: var(--accent); margin-left: 6px; text-decoration: none; font-weight: 700; }
+#cmp-bar button {
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: .05em;
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  background: var(--accent);
+  color: #f6eeda;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+#cmp-bar button:disabled { opacity: .45; cursor: default; }
+#cmp-bar #cmp-clear { background: var(--parchment); color: var(--ink-soft); }
+.ref-box.wide { max-width: 920px; }
+.ref-box table th {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: left;
+  padding: 3px 8px 5px 0;
+  border-bottom: 2px solid var(--line-dark);
+  vertical-align: bottom;
+}
+.ref-box table th img {
+  display: block;
+  width: 36px;
+  border: 1px solid var(--line-dark);
+  border-radius: 2px;
+  margin-bottom: 3px;
+  background: #2e2418;
+}
+.ref-box table th a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--line-dark); cursor: pointer; }
+.ref-box table th a:hover { color: var(--accent); }
+.ref-box td.best { color: var(--good); font-weight: 700; }
 tr.unit.flash { animation: rowflash 1.6s ease-out; }
 @keyframes rowflash { 0% { background: #d8b86a; } 100% { background: var(--row-alt); } }
 footer {
@@ -1131,6 +1191,19 @@ footer {
 @media (max-width: 900px) {
   .hide-sm { display: none; }
   .detail-inner { flex-direction: column; }
+}
+@media (max-width: 620px) {
+  .hide-xs { display: none; }
+  body { font-size: 14px; }
+  tbody td { padding: 2px 4px; font-size: 13.5px; }
+  td.name { font-size: 14px; white-space: normal; }
+  td.name .cls { display: none; }
+  thead th { padding: 5px 4px; font-size: 10.5px; }
+  .controls { gap: 6px 8px; padding: 8px 8px; }
+  .controls input[type=search] { width: 130px; }
+  main { padding: 8px 4px 60px; }
+  header h1 { font-size: 24px; }
+  .detail-stats td:first-child { width: 90px; }
 }
 </style>
 </head>
@@ -1169,10 +1242,10 @@ footer {
         <th data-k="rng" class="num hide-sm">Rng <span class="arrow"></span></th>
         <th data-k="ammo" class="num hide-sm">Ammo <span class="arrow"></span></th>
         <th data-k="def" class="num">Def <span class="arrow"></span></th>
-        <th data-k="morale" class="num">Mor <span class="arrow"></span></th>
+        <th data-k="morale" class="num hide-xs">Mor <span class="arrow"></span></th>
         <th data-k="hp" class="num hide-sm">HP <span class="arrow"></span></th>
         <th data-k="cost" class="num">Cost <span class="arrow"></span></th>
-        <th data-k="upkeep" class="num">Upkeep <span class="arrow"></span></th>
+        <th data-k="upkeep" class="num hide-xs">Upkeep <span class="arrow"></span></th>
         <th data-k="turns" class="num hide-sm">Turns <span class="arrow"></span></th>
       </tr>
     </thead>
@@ -1182,6 +1255,13 @@ footer {
 </main>
 
 <div id="ref-modal" hidden><div class="ref-box" role="dialog"></div></div>
+
+<div id="cmp-bar" hidden>
+  <span class="cmp-label">Compare</span>
+  <span id="cmp-items"></span>
+  <button id="cmp-go">Compare</button>
+  <button id="cmp-clear">Clear</button>
+</div>
 
 <footer>Soldier counts shown at Huge unit size (game scales data values &times;2.5) &middot; Generated ${generated} from <code>export_descr_unit.txt</code> &amp; <code>export_units.txt</code> &middot; ${model.units.length} units &middot; rebuild with <code>node build.js</code></footer>
 
@@ -1197,6 +1277,12 @@ const inGame = (n) => Math.round(n * SIZE_SCALE);
 UNITS.forEach((u, i) => { u.id = i; u.def = u.armour + u.skill + u.shield; });
 
 const state = { q: '', faction: '', cat: '', sortKey: null, sortDir: 1, open: new Set() };
+
+// Keep the sticky column header just below the (wrapping) control bar.
+const setCtrlH = () => document.documentElement.style.setProperty('--ctrlh',
+  document.querySelector('.controls').offsetHeight + 'px');
+window.addEventListener('resize', setCtrlH);
+setCtrlH();
 
 const $faction = document.getElementById('faction');
 for (const f of FACTIONS) {
@@ -1271,10 +1357,10 @@ function rowHtml(u) {
     '<td class="num hide-sm">' + fmt(u.rng) + '</td>' +
     '<td class="num hide-sm">' + fmt(u.ammo) + '</td>' +
     '<td class="num">' + def + '</td>' +
-    '<td class="num">' + mor + '</td>' +
+    '<td class="num hide-xs">' + mor + '</td>' +
     '<td class="num hide-sm">' + hp + '</td>' +
     '<td class="num">' + u.cost + '</td>' +
-    '<td class="num">' + u.upkeep + '</td>' +
+    '<td class="num hide-xs">' + u.upkeep + '</td>' +
     '<td class="num hide-sm">' + u.turns + '</td>' +
   '</tr>';
 }
@@ -1368,14 +1454,14 @@ function detailHtml(u) {
   }
   if (notes.length) add('Traits', notes.join(', '));
   if (u.eop) add('Source', 'Added at runtime by M2TWEOP (eopData/eopScripts)');
-  add('Link', '<a class="ref" data-copy="' + u.slug + '" title="Copy a direct link to this unit">copy link</a> <span class="dim">#' + u.slug + '</span>');
+  add('Link', '<a class="ref" data-copy="' + u.slug + '" title="Copy a direct link to this unit">copy link</a> <span class="dim">#' + u.slug + '</span> &middot; <a class="ref" data-pin="' + u.id + '">' + (pins.includes(u.id) ? 'remove from compare' : 'compare') + '</a>');
   // Prefer the large unit_info portrait; fall back to the embedded card if the
   // portraits/ folder is missing (e.g. the site was shared as index.html alone).
   let card = '';
   if (u.pic) {
     card = '<div class="detail-card"><img alt="" loading="lazy" data-fb="' + u.id + '" src="' + u.pic + '"></div>';
   } else if (u.card) {
-    card = '<div class="detail-card"><img alt="" class="small" src="' + u.card + '"></div>';
+    card = '<div class="detail-card"><img alt="" class="small" data-last="1" src="' + u.card + '"></div>';
   }
   return '<tr class="detail"><td colspan="13"><div class="detail-inner">' + card +
     '<div class="detail-desc">' + (u.short ? '<p class="short">' + esc(u.short) + '</p>' : '') + paras + '</div>' +
@@ -1455,7 +1541,60 @@ function refUsers(title, list) {
     list.map(u => '<a class="ref-unit" data-id="' + u.id + '">' + esc(u.name) + '</a>').join('') + '</div>';
 }
 
+// ---- Side-by-side comparison ----
+const pins = [];
+
+function renderPins() {
+  const bar = document.getElementById('cmp-bar');
+  bar.hidden = pins.length === 0;
+  document.getElementById('cmp-items').innerHTML = pins.map(id =>
+    '<span class="pin">' + esc(UNITS[id].name) + '<a data-unpin="' + id + '" title="Remove">&times;</a></span>').join('');
+  document.getElementById('cmp-go').disabled = pins.length < 2;
+}
+
+function openCompare() {
+  const us = pins.map(id => UNITS[id]);
+  let html = '<button class="ref-close">Close</button><span class="ref-kind">Side by side</span><h2>Comparison</h2><table>';
+  html += '<tr><td></td>' + us.map(u =>
+    '<th>' + (u.card ? '<img alt="" src="' + u.card + '">' : '') +
+    '<a class="ref-unit" data-id="' + u.id + '">' + esc(u.name) + '</a></th>').join('') + '</tr>';
+  const row = (label, vals, opts) => {
+    opts = opts || {};
+    const nums = vals.map(v => (typeof v === 'number' ? v : null));
+    const present = nums.filter(v => v !== null);
+    const best = present.length > 1 && Math.min(...present) !== Math.max(...present)
+      ? (opts.lower ? Math.min(...present) : Math.max(...present)) : null;
+    html += '<tr><td>' + label + '</td>' + vals.map((v, i) => {
+      const txt = v === null || v === undefined || v === '' ? '<span class="dim">—</span>' : (opts.fmt ? opts.fmt(v, i) : v);
+      return '<td' + (best !== null && nums[i] === best ? ' class="best"' : '') + '>' + txt + '</td>';
+    }).join('') + '</tr>';
+  };
+  row('Faction', us.map(u => esc(u.faction)));
+  row('Type', us.map(u => typeLabel(u)));
+  row('Soldiers', us.map(u => u.men), { fmt: v => inGame(v) });
+  row('Melee attack', us.map(u => u.atk), { fmt: (v, i) => v + badges(us[i].meleeAttr) });
+  row('Charge', us.map(u => u.chg));
+  row('Missile attack', us.map(u => u.msl), { fmt: (v, i) => v + badges(us[i].mslAttr) });
+  row('Range', us.map(u => u.rng));
+  row('Ammo', us.map(u => u.ammo));
+  row('Defence', us.map(u => u.def), { fmt: (v, i) => v + ' <span class="def-split">(' + us[i].armour + '\\u00B7' + us[i].skill + '\\u00B7' + us[i].shield + ')</span>' });
+  row('Morale', us.map(u => u.morale), { fmt: (v, i) => v + (us[i].lockMorale ? ' \\u221E' : '') });
+  row('Hit points', us.map(u => u.hp));
+  row('Heat fatigue', us.map(u => u.heat), { lower: true, fmt: v => (v ? '-' + v : '0') });
+  row('Cost', us.map(u => u.cost), { lower: true });
+  row('Upkeep', us.map(u => u.upkeep), { lower: true });
+  row('Turns to train', us.map(u => u.turns), { lower: true });
+  html += '</table><p class="ref-note">Green marks the best value in each row (lowest for cost, upkeep, turns and heat).</p>';
+  refBox.className = 'ref-box wide';
+  refBox.innerHTML = html;
+  refModal.hidden = false;
+}
+
+document.getElementById('cmp-go').addEventListener('click', openCompare);
+document.getElementById('cmp-clear').addEventListener('click', () => { pins.length = 0; renderPins(); render(); });
+
 function openRef(kind, key) {
+  refBox.className = 'ref-box';
   let html = '<button class="ref-close">Close</button>';
   if (kind === 'proj') {
     const p = PROJ[key];
@@ -1527,6 +1666,23 @@ document.addEventListener('click', (e) => {
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => {});
     return;
   }
+  const pin = e.target.closest('a[data-pin]');
+  if (pin) {
+    const id = Number(pin.dataset.pin);
+    const i = pins.indexOf(id);
+    if (i >= 0) pins.splice(i, 1);
+    else if (pins.length < 4) pins.push(id);
+    renderPins();
+    render(); // refresh "compare"/"remove from compare" labels in open details
+    return;
+  }
+  const unpin = e.target.closest('a[data-unpin]');
+  if (unpin) {
+    pins.splice(pins.indexOf(Number(unpin.dataset.unpin)), 1);
+    renderPins();
+    render();
+    return;
+  }
   const ref = e.target.closest('a.ref');
   if (ref) { const [kind, key] = ref.dataset.ref.split(':'); openRef(kind, key); return; }
   const unitLink = e.target.closest('a.ref-unit');
@@ -1535,14 +1691,21 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') refModal.hidden = true; });
 
-// Portrait failed to load (portraits/ folder absent) -> swap in the embedded card.
+// Image fallbacks when the portraits/ or cards/ folders are absent (e.g. the
+// site was shared as index.html alone): detail portrait -> card -> remove;
+// row thumbnail -> remove.
 document.getElementById('rows').addEventListener('error', (e) => {
   const img = e.target;
-  if (!(img instanceof HTMLImageElement) || !img.dataset.fb) return;
-  const u = UNITS[Number(img.dataset.fb)];
-  delete img.dataset.fb;
-  if (u && u.card) { img.src = u.card; img.className = 'small'; }
-  else img.closest('.detail-card')?.remove();
+  if (!(img instanceof HTMLImageElement)) return;
+  if (img.dataset.fb) {
+    const u = UNITS[Number(img.dataset.fb)];
+    delete img.dataset.fb;
+    if (u && u.card) { img.src = u.card; img.className = 'small'; img.dataset.last = '1'; }
+    else img.closest('.detail-card')?.remove();
+    return;
+  }
+  if (img.dataset.last) img.closest('.detail-card')?.remove();
+  else if (img.classList.contains('card')) img.remove();
 }, true);
 
 document.getElementById('rows').addEventListener('click', (e) => {
@@ -1584,9 +1747,10 @@ console.log(`${model.recruitable} units have building recruitment data; ${model.
 if (model.missingNames) console.log(`${model.missingNames} units had no entry in export_units.txt (internal name used).`);
 if (model.missingCards) console.log(`${model.missingCards} units had no card image in data/ui/units/mercs.`);
 if (model.missingPortraits) console.log(`${model.missingPortraits} units had no portrait in data/ui/unit_info/merc.`);
-if (fs.existsSync(OUT_PORTRAITS)) {
-  const pics = fs.readdirSync(OUT_PORTRAITS).filter((f) => f.endsWith('.png'));
-  const mb = pics.reduce((s, f) => s + fs.statSync(path.join(OUT_PORTRAITS, f)).size, 0) / 1048576;
-  console.log(`portraits/: ${pics.length} PNGs, ${mb.toFixed(0)} MB`);
+for (const [dir, label] of [[OUT_PORTRAITS, 'portraits/'], [OUT_CARDS, 'cards/']]) {
+  if (!fs.existsSync(dir)) continue;
+  const pics = fs.readdirSync(dir).filter((f) => f.endsWith('.png'));
+  const mb = pics.reduce((s, f) => s + fs.statSync(path.join(dir, f)).size, 0) / 1048576;
+  console.log(`${label}: ${pics.length} PNGs, ${mb.toFixed(1)} MB`);
 }
 console.log(`Wrote ${OUT_HTML} (${(fs.statSync(OUT_HTML).size / 1024).toFixed(0)} KB)`);
