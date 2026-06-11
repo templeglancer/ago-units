@@ -11,6 +11,7 @@ const zlib = require('zlib');
 const MOD_ROOT = path.join(__dirname, '..');
 const UNITS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_units.txt');
 const EDU_TXT = path.join(MOD_ROOT, 'data', 'export_descr_unit.txt');
+const EOP_SCRIPTS = path.join(MOD_ROOT, 'eopData', 'eopScripts');
 const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
 const OUT_HTML = path.join(__dirname, 'index.html');
@@ -253,9 +254,12 @@ function parseWeapon(value) {
 }
 
 function parseEdu(file) {
-  const text = fs.readFileSync(file, 'latin1');
+  return parseEduText(fs.readFileSync(file, 'latin1'), 'Miscellaneous');
+}
+
+function parseEduText(text, startSection) {
   const units = [];
-  let section = 'Miscellaneous';
+  let section = startSection;
   let u = null;
   const push = () => {
     if (u) units.push(u);
@@ -272,7 +276,7 @@ function parseEdu(file) {
     const kv = line.match(/^([a-z_][a-z_ 0-9]*?)\s{2,}(.*)$/i) || line.match(/^(\S+)\s+(.*)$/);
     if (!kv) continue;
     const key = kv[1].trim().toLowerCase();
-    const value = kv[2].trim();
+    const value = kv[2].split(';')[0].trim(); // strip inline comments
     if (key === 'type') {
       push();
       u = { type: value, section, attributes: [], officers: 0 };
@@ -296,6 +300,9 @@ function parseEdu(file) {
       case 'attributes': u.attributes = splitCsv(value); break;
       case 'formation': u.formations = splitCsv(value).slice(5).filter((f) => f && f !== 'square'); break;
       case 'mount_effect': u.mountEffect = value; break;
+      case 'move_speed_mod': u.moveSpeed = Number(value); break;
+      case 'ownership': u.ownership = splitCsv(value); break;
+      case 'era 0': u.era0 = splitCsv(value)[0]; break;
       case 'stat_health': {
         const p = splitCsv(value);
         u.hp = Number(p[0]);
@@ -339,6 +346,51 @@ function parseEdu(file) {
   return units;
 }
 
+// --------------------------------------------------------------- EOP units
+// M2TWEOP (eopData/eopScripts) injects extra units at runtime. Active entries
+// in Units/EOPDU.lua either point at an EDU-format file under
+// Resources/Unit_Types (new units, parsed here) or clone an existing unit via
+// rootUnit (stat-identical bodyguard copies, skipped to avoid duplicate rows).
+
+function parseEopUnits() {
+  const luaFile = path.join(EOP_SCRIPTS, 'Units', 'EOPDU.lua');
+  if (!fs.existsSync(luaFile)) return [];
+  const lua = fs.readFileSync(luaFile, 'utf8');
+  const out = [];
+  for (const m of lua.matchAll(/^[ \t]{8}(\w+) = eopUnit:new \{([\s\S]*?)^[ \t]{8}\}/gm)) {
+    const body = m[2];
+    const filePath = (body.match(/filePath\s*=\s*"([^"]*)"/) || [])[1];
+    if (!filePath) continue;
+    const file = path.join(EOP_SCRIPTS, 'Resources', filePath.replace(/^\//, ''));
+    if (!fs.existsSync(file)) continue;
+    const parsed = parseEduText(fs.readFileSync(file, 'latin1'), 'EOP Additions');
+    if (!parsed.length) continue;
+    const u = parsed[0];
+    u.eop = true;
+    if (/freeUpkeep\s*=\s*true/.test(body) && !u.attributes.includes('free_upkeep_unit')) {
+      u.attributes.push('free_upkeep_unit');
+    }
+    out.push(u);
+  }
+  return out;
+}
+
+// Main-EDU units reveal which vanilla ownership tag each faction uses
+// (e.g. sicily -> Gondor); EOP units are slotted into factions through it.
+function buildOwnerMap(edu) {
+  const tally = {};
+  for (const u of edu) {
+    const owner = [u.era0, ...(u.ownership || [])].find((o) => o && o !== 'slave');
+    if (!owner) continue;
+    (tally[owner] = tally[owner] || {})[u.section] = (tally[owner][u.section] || 0) + 1;
+  }
+  const map = {};
+  for (const [o, secs] of Object.entries(tally)) {
+    map[o] = Object.entries(secs).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  return map;
+}
+
 // ----------------------------------------------------------------- assembly
 
 function isMissileWeapon(w) {
@@ -356,6 +408,12 @@ function cleanText(s) {
 function buildModel() {
   const names = parseExportUnits(UNITS_TXT);
   const edu = parseEdu(EDU_TXT);
+  const eop = parseEopUnits();
+  const ownerMap = buildOwnerMap(edu);
+  for (const u of eop) {
+    const owner = [u.era0, ...(u.ownership || [])].find((o) => o && o !== 'slave' && ownerMap[o]);
+    u.section = owner ? ownerMap[owner] : 'EOP Additions';
+  }
   const cardIndex = buildCardIndex();
   const portraitIndex = buildPortraitIndex();
   const units = [];
@@ -363,7 +421,7 @@ function buildModel() {
   let missingCards = 0;
   let missingPortraits = 0;
 
-  for (const u of edu) {
+  for (const u of [...edu, ...eop]) {
     const dict = (u.dict || u.type).trim();
     const key = dict.toLowerCase();
     const name = names[key] || u.type;
@@ -419,6 +477,8 @@ function buildModel() {
       shipType: u.ship || '',
       vsMounts: u.mountEffect || '',
       formations: u.formations || [],
+      moveSpeed: u.moveSpeed || 0,
+      eop: !!u.eop,
       card,
       pic,
       attributes: u.attributes || [],
@@ -427,8 +487,13 @@ function buildModel() {
     });
   }
 
+  // EOP units join the end of their faction's group (stable sort by the
+  // factions' first appearance keeps the original order otherwise).
+  const order = [...new Set(units.map((x) => x.faction))];
+  units.sort((a, b) => order.indexOf(a.faction) - order.indexOf(b.faction));
+
   const factions = [...new Set(units.map((x) => x.faction))];
-  return { units, factions, missingNames, missingCards, missingPortraits };
+  return { units, factions, missingNames, missingCards, missingPortraits, eopCount: eop.length };
 }
 
 // --------------------------------------------------------------------- html
@@ -611,6 +676,7 @@ tr.faction-row td .fcount { color: var(--ink-soft); font-size: 12px; letter-spac
   margin-left: 4px;
   vertical-align: 1px;
 }
+.badge.eop { border-color: var(--accent); color: var(--accent); }
 tr.detail td {
   background: #faf3df;
   border: 1px solid var(--line-dark);
@@ -780,7 +846,9 @@ function rowHtml(u) {
   const mor = u.lockMorale ? u.morale + '<span class="badge" title="Morale locked: this unit never routs">&#8734;</span>' : u.morale;
   const card = u.card ? '<img class="card" loading="lazy" alt="" src="' + u.card + '">' : '';
   return '<tr class="unit' + (state.open.has(u.id) ? ' open' : '') + '" data-id="' + u.id + '">' +
-    '<td class="name">' + card + esc(u.name) + ' <span class="cls">' + typeLabel(u) + '</span></td>' +
+    '<td class="name">' + card + esc(u.name) +
+      (u.eop ? '<span class="badge eop" title="Added at runtime by the M2TWEOP engine overhaul">EOP</span>' : '') +
+      ' <span class="cls">' + typeLabel(u) + '</span></td>' +
     '<td class="num">' + men + '</td>' +
     '<td class="num">' + fmt(u.atk) + badges(u.meleeAttr) + '</td>' +
     '<td class="num hide-sm">' + fmt(u.chg) + '</td>' +
@@ -826,6 +894,7 @@ function detailHtml(u) {
   add('Morale', u.morale + (u.lockMorale ? ' (locked — never routs)' : '') + ' · ' + u.discipline + ' · ' + u.training.replace(/_/g, ' '));
   if (u.vsMounts) add('Vs mounts', esc(u.vsMounts));
   if (u.formations.length) add('Formations', u.formations.map(f => f.replace(/_/g, ' ')).join(', '));
+  if (u.moveSpeed && u.moveSpeed !== 1) add('Move speed', '\\u00D7' + u.moveSpeed);
   if (u.mount) add('Mount', esc(u.mount));
   if (u.engine) add('Engine', esc(u.engine.replace(/_/g, ' ')));
   add('Recruitment', u.cost + ' gold · ' + u.upkeep + ' upkeep · ' + u.turns + (u.turns === 1 ? ' turn' : ' turns'));
@@ -835,6 +904,7 @@ function detailHtml(u) {
     if (g) add('Terrain', g);
   }
   if (notes.length) add('Traits', notes.join(', '));
+  if (u.eop) add('Source', 'Added at runtime by M2TWEOP (eopData/eopScripts)');
   // Prefer the large unit_info portrait; fall back to the embedded card if the
   // portraits/ folder is missing (e.g. the site was shared as index.html alone).
   let card = '';
@@ -938,7 +1008,7 @@ render();
 
 const model = buildModel();
 fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
-console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections.`);
+console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections (${model.eopCount} added from eopData).`);
 if (model.missingNames) console.log(`${model.missingNames} units had no entry in export_units.txt (internal name used).`);
 if (model.missingCards) console.log(`${model.missingCards} units had no card image in data/ui/units/mercs.`);
 if (model.missingPortraits) console.log(`${model.missingPortraits} units had no portrait in data/ui/unit_info/merc.`);

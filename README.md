@@ -30,6 +30,9 @@ The site is generated from:
 - `../data/ui/units/mercs/#*.tga` — unit cards (converted to PNG and embedded at build time)
 - `../data/ui/unit_info/merc/*_info.tga` — large unit portraits (converted to
   PNG in `portraits/`; only changed files are reconverted)
+- `../eopData/eopScripts/Units/EOPDU.lua` + `Resources/Unit_Types/*.txt` —
+  extra units injected at runtime by M2TWEOP (marked with an EOP badge;
+  stat-identical `rootUnit` bodyguard clones are skipped)
 
 Whenever those files change, regenerate the page with:
 
@@ -41,7 +44,8 @@ This rewrites `index.html` in place. No dependencies are needed beyond Node.
 
 ## Features
 
-- All 531 units grouped by faction, in mod file order, each with its in-game unit card
+- All 606 units (531 from the base files + 75 M2TWEOP additions) grouped by
+  faction, in mod file order, each with its in-game unit card
 - Special formations (shield wall, phalanx, schiltrom, wedge, horde) and bonuses vs mounts in the expanded view
 - Search box, faction dropdown, and category filters (infantry / cavalry / ranged / siege / ships)
 - Click any column header to sort (once = descending, twice = ascending, third click returns to faction grouping)
