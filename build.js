@@ -648,6 +648,17 @@ function buildModel() {
     return e.replace(/_/g, ' ');
   };
 
+  // Stable per-unit slug for #deep-links, derived from the (unique) EDU type.
+  const slugSeen = new Set();
+  const slugify = (t) => {
+    const base = t.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    let s = base;
+    let n = 2;
+    while (slugSeen.has(s)) s = base + '-' + n++;
+    slugSeen.add(s);
+    return s;
+  };
+
   const units = [];
   let missingNames = 0;
   let missingCards = 0;
@@ -729,6 +740,7 @@ function buildModel() {
 
     units.push({
       name,
+      slug: slugify(u.type),
       faction: u.section,
       category: u.category || '',
       class: u.class || '',
@@ -1356,6 +1368,7 @@ function detailHtml(u) {
   }
   if (notes.length) add('Traits', notes.join(', '));
   if (u.eop) add('Source', 'Added at runtime by M2TWEOP (eopData/eopScripts)');
+  add('Link', '<a class="ref" data-copy="' + u.slug + '" title="Copy a direct link to this unit">copy link</a> <span class="dim">#' + u.slug + '</span>');
   // Prefer the large unit_info portrait; fall back to the embedded card if the
   // portraits/ folder is missing (e.g. the site was shared as index.html alone).
   let card = '';
@@ -1486,12 +1499,34 @@ function jumpToUnit(id) {
   document.getElementById('faction').value = '';
   for (const x of document.querySelectorAll('.catbtns button')) x.classList.toggle('active', x.dataset.cat === '');
   state.open.add(Number(id));
+  setHash(UNITS[Number(id)].slug);
   render();
   const row = document.querySelector('tr.unit[data-id="' + id + '"]');
   if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
 }
 
+// ---- Deep links: the URL hash tracks the most recently opened unit ----
+function setHash(slug) {
+  history.replaceState(null, '', slug ? '#' + slug : location.pathname + location.search);
+}
+function openFromHash() {
+  const slug = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (!slug) return;
+  const u = UNITS.find(x => x.slug === slug);
+  if (u && !state.open.has(u.id)) jumpToUnit(u.id);
+}
+window.addEventListener('hashchange', openFromHash);
+
 document.addEventListener('click', (e) => {
+  const cp = e.target.closest('a[data-copy]');
+  if (cp) {
+    const slug = cp.dataset.copy;
+    setHash(slug);
+    const url = location.href.split('#')[0] + '#' + slug;
+    const done = () => { cp.textContent = 'copied!'; setTimeout(() => { cp.textContent = 'copy link'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => {});
+    return;
+  }
   const ref = e.target.closest('a.ref');
   if (ref) { const [kind, key] = ref.dataset.ref.split(':'); openRef(kind, key); return; }
   const unitLink = e.target.closest('a.ref-unit');
@@ -1514,11 +1549,26 @@ document.getElementById('rows').addEventListener('click', (e) => {
   const tr = e.target.closest('tr.unit');
   if (!tr) return;
   const id = Number(tr.dataset.id);
-  if (state.open.has(id)) state.open.delete(id); else state.open.add(id);
+  if (state.open.has(id)) {
+    state.open.delete(id);
+    if (location.hash === '#' + UNITS[id].slug) setHash('');
+  } else {
+    state.open.add(id);
+    setHash(UNITS[id].slug);
+  }
   render();
 });
 
+// The browser's scroll restoration on reload would override the deep-link
+// scroll; take over when the page is opened with a unit hash.
+if (location.hash && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
 render();
+openFromHash();
+setTimeout(() => {
+  // 'instant' overrides the page's smooth scrolling, which the browser can
+  // cancel while the page is still loading.
+  if (location.hash) document.querySelector('tr.unit.open')?.scrollIntoView({ block: 'center', behavior: 'instant' });
+}, 300);
 </script>
 </body>
 </html>

@@ -69,3 +69,6 @@ This rewrites `index.html` in place. No dependencies are needed beyond Node.
   (from `descr_projectile.txt` / `descr_mount.txt` / `armour_ug_levels`) and
   cross-links to every unit sharing it
 - Def column shows total (armour · defence skill · shield)
+- Deep links: opening a unit puts `#unit-slug` in the URL, and every expanded
+  view has a "copy link" action — `https://agocompendium.com/#uruk-hai-infantry`
+  opens the site scrolled to that unit with its details expanded
