@@ -6,8 +6,9 @@ descriptions, and battle stats merged from the mod's data files.
 ## Viewing
 
 Just open `index.html` in any browser — no server or internet connection
-required (the classical fonts load from Google Fonts when online, with serif
-fallbacks when offline).
+required. The classical fonts are self-hosted in `fonts/` (no Google Fonts
+dependency, so the site renders correctly in regions where Google is blocked);
+without the folder the page falls back to system serif fonts.
 
 ## Sharing
 
