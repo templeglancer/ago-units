@@ -95,6 +95,14 @@ needed beyond Node.
   "Buildings" rows link across the other way
 - Guild chains also explain how guild points are earned (from the eopData
   guild scripts) and which factions are offered each guild
+- Script-created M2TWEOP buildings are included with an EOP badge: the
+  Dorwinion Kantor (from `dorwinionEncircleSea.lua`) — trade outposts that
+  appear after the "Encircle the Sea of Rhûn" event and exchange recruits
+  between Dorwinion and its trade partners
+- Faction names are unified to the in-game names everywhere: conditional
+  effect tooltips and event requirements translate the vanilla tags the mod
+  is built on ("sicily" shows as Gondor, "normans" as Bree-land, culture
+  tokens expand to their factions)
 - Shared chains are faction-aware: recruit lists are grouped per faction, and
   selecting a faction in the dropdown shows that faction's own building names,
   pictures, recruits and effect values (e.g. Isengard's tier of the governance

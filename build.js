@@ -872,19 +872,20 @@ function effectText(key, vals) {
   return label + ' +' + (lo === hi ? hi : lo + '–' + hi);
 }
 
-function renderEffectGroups(groups) {
+function renderEffectGroups(groups, prettyCond) {
   return groups.map((g) => {
     const vals = [...new Set(g.vals)].sort((a, b) => a - b);
     const txt = effectText(g.key, vals);
     if (g.cond) {
-      const safe = g.cond.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      const shown = prettyCond ? prettyCond(g.cond) : g.cond;
+      const safe = shown.replace(/"/g, '&quot;').replace(/</g, '&lt;');
       return `<span class="cond" title="requires: ${safe}">${txt}*</span>`;
     }
     return txt;
   });
 }
 
-function aggregateEffects(effects) {
+function aggregateEffects(effects, prettyCond) {
   const byKey = new Map();
   for (const e of effects) {
     const conditional = /event_counter|hidden_resource/.test(e.cond);
@@ -892,11 +893,34 @@ function aggregateEffects(effects) {
     if (!byKey.has(k)) byKey.set(k, { key: e.key, vals: [], cond: conditional ? e.cond : '' });
     byKey.get(k).vals.push(e.val);
   }
-  return renderEffectGroups([...byKey.values()]);
+  return renderEffectGroups([...byKey.values()], prettyCond);
 }
 
 const effectFacs = (cond) => ((cond.match(/factions\s*\{([^}]*)\}/) || [])[1] || '')
   .split(',').map((s) => s.trim()).filter(Boolean);
+
+// Readers should only ever see the game's faction names, never the vanilla
+// tags the mod is built on ("sicily" is Gondor). Translates tags (and culture
+// tokens, which expand to their factions) inside raw EDB condition strings and
+// event-counter names.
+function makePretty(ownerMap, cultures) {
+  const cultureFacs = {};
+  for (const [t, c] of Object.entries(cultures)) {
+    if (ownerMap[t]) (cultureFacs[c] = cultureFacs[c] || []).push(ownerMap[t]);
+  }
+  const tag = (t) => ownerMap[t] || (cultureFacs[t] ? cultureFacs[t].join(', ') : t);
+  const event = (e) => {
+    const m = e.match(/^([a-z]+)_allied_([a-z]+)$/);
+    if (m && ownerMap[m[1]] && ownerMap[m[2]]) return 'alliance: ' + ownerMap[m[1]] + ' & ' + ownerMap[m[2]];
+    return e.split('_').map((w) => ownerMap[w] || w).join(' ');
+  };
+  const cond = (c) => c
+    .replace(/factions\s*\{([^}]*)\}/g, (m, inner) =>
+      inner.split(',').map((s) => s.trim()).filter(Boolean).map(tag).join(', '))
+    .replace(/event_counter\s+(\S+)(\s+1\b)?/g, (m, e) => 'event ' + event(e))
+    .replace(/hidden_resource\s+(\S+)/g, (m, h) => 'region ' + h.replace(/_/g, ' '));
+  return { tag, event, cond };
+}
 
 // Resolve the effect list from one faction's point of view: variants gated to
 // other factions drop out, and the factions clause itself disappears from the
@@ -904,7 +928,7 @@ const effectFacs = (cond) => ((cond.match(/factions\s*\{([^}]*)\}/) || [])[1] ||
 // faction has several unconditional values for a key, the highest applies.
 // EDB factions clauses sometimes name a culture instead of a faction tag, so
 // the faction's culture also counts as a match.
-function effectsForFaction(effects, facTag, culture) {
+function effectsForFaction(effects, facTag, culture, prettyCond) {
   const byKey = new Map();
   for (const e of effects) {
     const facs = effectFacs(e.cond);
@@ -917,7 +941,7 @@ function effectsForFaction(effects, facTag, culture) {
   }
   return renderEffectGroups([...byKey.values()].map((g) => (
     g.cond ? g : { ...g, vals: [Math.max(...g.vals)] }
-  )));
+  )), prettyCond);
 }
 
 // Chain slugs must be reproducible from both pages (unit-page links point at
@@ -925,6 +949,30 @@ function effectsForFaction(effects, facTag, culture) {
 const chainSlug = (n) => n.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
 // Assembles the buildings-page model from the parsed EDB chains.
+// M2TWEOP can also create buildings entirely from script. The only one in AGO
+// is the Dorwinion Kantor (Faction_Scripts/Dorwinion/dorwinionEncircleSea.lua):
+// after Dorwinion completes "Encircle the Sea of Rhûn", trade outposts are
+// built in partner capitals (and Dorwinion's own), each opening a small
+// exchange of recruits between the two nations. Its effects, description,
+// picture and the required settlements are read from the script.
+function parseEopKantor() {
+  const file = path.join(EOP_SCRIPTS, 'Faction_Scripts', 'Dorwinion', 'dorwinionEncircleSea.lua');
+  if (!fs.existsSync(file)) return null;
+  const lua = fs.readFileSync(file, 'utf8');
+  const desc = (lua.match(/kantorDescripton\s*=\s*"([^"]+)"/) || [])[1] || '';
+  const setts = [...((lua.match(/requiredSettlements\s*=\s*\{([\s\S]*?)\}/) || [])[1] || '')
+    .matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  const ev = (lua.match(/eventCounter\s*=\s*"([^"]+)"/) || [])[1] || '';
+  const seen = new Set();
+  const effects = [...lua.matchAll(/addCapability\(buildingCapability\.(\w+),\s*(\d+)/g)]
+    .filter((m) => EFFECT_LABELS[m[1]] && !seen.has(m[1]) && seen.add(m[1]))
+    .map((m) => effectText(m[1], [Number(m[2])]));
+  const tgaRel = (lua.match(/"([^"]*buildings\/[^"]*constructed[^"]*\.tga)"/) || [])[1] || '';
+  const tga = tgaRel ? path.join(MOD_ROOT, tgaRel.replace(/^\//, '')) : '';
+  const pic = tga && fs.existsSync(tga) ? exportImage(tga, 'eop_dorwinion_kantor', OUT_BPICS, 'buildingpics') : '';
+  return { desc, setts, ev, effects, pic };
+}
+
 // Default pictures (no faction selected) come from one culture's series per
 // chain, preferring the human and elven art sets; without this the pick falls
 // to whichever culture folder sorts first (eastern_european — the orc set),
@@ -934,6 +982,7 @@ const PIC_PREF = ['gondor', 'greek', 'northern_european', 'mesoamerican',
 
 function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType, picIndex) {
   const triggers = parseGuildTriggers();
+  const pretty = makePretty(ownerMap, cultures);
   const facNames = (facs) => [...new Set(facs.map((f) => ownerMap[f]).filter(Boolean))];
   // hidden resources used by at most 2 chains are unique-landmark locks
   const hrChains = new Map();
@@ -1015,9 +1064,9 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
       // they differ from the merged all-factions view
       const ffx = {};
       if (l.effects.some((e) => /factions\s*\{/.test(e.cond))) {
-        const def = aggregateEffects(l.effects).join('');
+        const def = aggregateEffects(l.effects, pretty.cond).join('');
         for (const t of (candTags.length ? candTags : allTags)) {
-          const fx = effectsForFaction(l.effects, t, cultures[t]);
+          const fx = effectsForFaction(l.effects, t, cultures[t], pretty.cond);
           if (fx.join('') !== def) ffx[ownerMap[t]] = fx;
         }
       }
@@ -1027,9 +1076,9 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
         cost: l.cost, time: l.time,
         min: l.min.replace(/_/g, ' '),
         hr: l.hr.filter((h) => h !== 'unlocked').map((h) => h.replace(/_/g, ' ')), // 'unlocked' is a script flag, not a region
-        ev: l.ev.map((e) => e.replace(/_/g, ' ')),
+        ev: l.ev.map(pretty.event),
         facs: facNames(l.facs),
-        effects: aggregateEffects(l.effects),
+        effects: aggregateEffects(l.effects, pretty.cond),
         recruits: [...rec.values()].map((r) => ({ ...r, f: r.f ? [...r.f].sort() : [] })),
         points: guild ? guild.points[l.tier - 1] : null,
         pic: defPic,
@@ -1053,6 +1102,34 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
       gfacs: facNames((triggers[chain.name] || {}).facTags || []),
       pic: first.pic,
       levels,
+    });
+  }
+  // the one script-created (M2TWEOP) building
+  const kantor = parseEopKantor();
+  if (kantor) {
+    out.push({
+      slug: 'dorwinion-kantor',
+      chain: 'dorwinion_kantor_line',
+      name: 'Dorwinion Kantor',
+      cat: 'Economy',
+      tiers: 1,
+      facs: [],
+      desc: kantor.desc + ' Created by campaign script: once Dorwinion holds the Sea of Rhûn'
+        + (kantor.setts.length ? ' (' + kantor.setts.join(', ') + ')' : '')
+        + ', kantors appear over time in the capitals of its trade partners and in Dorwinion\'s own capital.'
+        + ' Each grants its host the listed bonuses and lets the partner capital train a few Dorwinion'
+        + ' units — and Dorwinion\'s capital a few of the partner\'s — drawn from each nation\'s'
+        + ' early, mid and elite tiers.',
+      guild: '', gname: '', how: [], gfacs: [],
+      pic: kantor.pic,
+      eop: true,
+      levels: [{
+        name: 'Dorwinion Kantor', names: {}, pics: {}, ffx: {},
+        kind: '', tier: 1, of: 1, cost: 0, time: 0, min: '',
+        hr: [], ev: kantor.ev ? [pretty.event(kantor.ev)] : [],
+        facs: [], effects: kantor.effects, recruits: [],
+        points: null, pic: kantor.pic,
+      }],
     });
   }
   return out;
@@ -1153,12 +1230,9 @@ function buildModel() {
     if (missing.length <= 3) return 'all except ' + missing.join(', ');
     return [...set].sort().join(', ');
   };
-  // e.g. turks_allied_normans -> the two factions behind the vanilla tags
-  const prettyEvent = (e) => {
-    const m = e.match(/^([a-z]+)_allied_([a-z]+)$/);
-    if (m && ownerMap[m[1]] && ownerMap[m[2]]) return 'alliance: ' + ownerMap[m[1]] + ' & ' + ownerMap[m[2]];
-    return e.replace(/_/g, ' ');
-  };
+  // vanilla tags inside event names become game faction names
+  // (turks_allied_normans -> "alliance: Northern Dúnedain & Bree-land")
+  const prettyEvent = makePretty(ownerMap, cultures).event;
 
   // Stable per-unit slug for #deep-links, derived from the (unique) EDU type.
   const slugSeen = new Set();
@@ -1219,7 +1293,7 @@ function buildModel() {
     }
     const recruit = [...merged.values()]
       .sort((a, b) => a.tier - b.tier || b.rate - a.rate)
-      .map((e) => ({ ...e, max: Math.round(e.max * 10) / 10, hr: [...e.hr].slice(0, 4), ev: [...e.ev].slice(0, 2) }));
+      .map((e) => ({ ...e, max: Math.round(e.max * 10) / 10, hr: [...e.hr].slice(0, 4), ev: [...e.ev].slice(0, 2).map(prettyEvent) }));
     if (recruit.length) recruitable += 1;
 
     // Mercenary pools: merge entries with identical terms, union their regions.
@@ -2451,6 +2525,17 @@ tr.bld.open { background: #ddcda2; }
 td.name { font-weight: 600; font-size: 15.5px; }
 td.name .guildtag { font-weight: 400; font-style: italic; color: var(--gold); font-size: 13px; margin-left: 8px; }
 td.name .kindtag { font-weight: 400; font-style: italic; color: var(--ink-soft); font-size: 13px; margin-left: 8px; }
+td.name .eoptag {
+  font-weight: 400;
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-left: 8px;
+  vertical-align: 1px;
+}
 td.name img.bpic {
   height: 34px;
   width: 34px;
@@ -2659,7 +2744,7 @@ function rowHtml(b) {
   const facs = state.fac ? (b.facs.length ? state.fac : 'All factions')
     : b.facs.length ? (b.facs.length > 4 ? b.facs.slice(0, 4).join(', ') + ' +' + (b.facs.length - 4) : b.facs.join(', ')) : 'All factions';
   return '<tr class="bld' + (state.open.has(b.id) ? ' open' : '') + '" data-id="' + b.id + '">' +
-    '<td class="name">' + pic + esc(lvlName(first)) + (b.guild ? '<span class="guildtag">guild</span>' : '') + (kind ? '<span class="kindtag">' + kind + '</span>' : '') + '</td>' +
+    '<td class="name">' + pic + esc(lvlName(first)) + (b.guild ? '<span class="guildtag">guild</span>' : '') + (b.eop ? '<span class="eoptag" title="Created at runtime by the M2TWEOP campaign scripts">EOP</span>' : '') + (kind ? '<span class="kindtag">' + kind + '</span>' : '') + '</td>' +
     '<td class="num">' + b.tiers + '</td>' +
     '<td class="num hide-xs">' + costRange(b) + '</td>' +
     '<td class="facs">' + esc(facs) + '</td>' +
