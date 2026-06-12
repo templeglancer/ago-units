@@ -121,7 +121,8 @@ needed beyond Node.
   relabels the columns with the castle stage names (Motte & Bailey → Citadel)
 - Factions page (`factions.html`): all 26 playable factions grouped into Free
   Peoples / Neutral / Shadow, each with its symbol, leader and capital, the
-  full campaign-selection overview, roster breakdown, and early/mid/elite
+  campaign-selection overview (folded to its first two sections, with a
+  "Read the full overview" unfold), roster breakdown, and early/mid/elite
   unit tiers (from `factionData.lua`) linking to the unit page; "View full
   roster" opens the unit page pre-filtered (`index.html?faction=...`)
 - Each faction card also states how far its smiths can upgrade unit armour

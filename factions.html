@@ -100,11 +100,23 @@ h2.side.evil { color: var(--bad); }
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--gold);
   margin: 12px 0 4px;
 }
 .fbody p { margin: 0 0 8px; max-width: 66ch; line-height: 1.5; }
 .fbody .quote { font-style: italic; color: var(--ink-soft); }
+.fbody .morebtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-style: italic;
+  color: var(--accent);
+  border-bottom: 1px dotted var(--accent);
+  cursor: pointer;
+  margin: 2px 0 8px;
+}
+.fbody .morebtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .fbody .quests { border-top: 1px dotted var(--line); margin-top: 14px; padding-top: 2px; }
 /* questline index: a chronicle's table of contents — title rows with dotted
    leaders, each unfolding its description on demand */
@@ -179,6 +191,7 @@ const FAC = [{"slug":"gondor","section":"Gondor","name":"Gondor","side":"good","
 FAC.forEach((f, i) => { f.id = i; });
 const open = new Set();
 const qopen = new Set(); // expanded questline rows, "slug:index"
+const bopen = new Set(); // cards showing the full campaign overview
 
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -191,16 +204,32 @@ function tierLine(list) {
 }
 
 // The campaign blurb: bold the section headers, italicise the lore quote.
-function descrHtml(f) {
+// One entry per block, so the card can fold long overviews.
+function descrBlocks(f) {
   const paras = f.descr.split(/\n+/).map(p => p.trim()).filter(Boolean)
     .filter(p => !/^(Leader|Heir|Capital):/.test(p));
   return paras.map(p => {
     const hm = p.match(/^([A-Z][\w'\u2019 -]{2,30}):\s*([\s\S]*)$/);
-    if (hm) return '<h3>' + esc(hm[1]) + '</h3>' + (hm[2] ? '<p>' + esc(hm[2]) + '</p>' : '');
-    if (/^[\u201c"]/.test(p)) return '<p class="quote">' + esc(p) + '</p>';
-    if (/^-\s/.test(p)) return '<p>' + esc(p) + '</p>';
-    return '<p>' + esc(p) + '</p>';
-  }).join('');
+    if (hm) return { h: true, html: '<h3>' + esc(hm[1]) + '</h3>' + (hm[2] ? '<p>' + esc(hm[2]) + '</p>' : '') };
+    if (/^[\u201c"]/.test(p)) return { h: false, html: '<p class="quote">' + esc(p) + '</p>' };
+    return { h: false, html: '<p>' + esc(p) + '</p>' };
+  });
+}
+
+// Overviews open folded to their first two sections; the rest unfolds.
+function descrHtml(f) {
+  const blocks = descrBlocks(f);
+  let cut = -1;
+  let hs = 0;
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].h && ++hs === 3) { cut = i; break; }
+  }
+  const all = bopen.has(f.id) || cut < 0;
+  return (all ? blocks : blocks.slice(0, cut)).map(b => b.html).join('') +
+    (cut >= 0
+      ? '<button class="morebtn" data-more="' + f.id + '">' +
+        (all ? 'Show less &uarr;' : 'Read the full overview &darr;') + '</button>'
+      : '');
 }
 
 // Questlines and campaign scripts, from the in-game faction overview
@@ -288,6 +317,15 @@ function render() {
 
 document.getElementById('main').addEventListener('click', (e) => {
   if (e.target.closest('a')) return;
+  const more = e.target.closest('.morebtn');
+  if (more) {
+    const id = Number(more.dataset.more);
+    if (bopen.has(id)) bopen.delete(id); else bopen.add(id);
+    render();
+    const again = document.querySelector('.morebtn[data-more="' + id + '"]');
+    if (again) again.focus({ preventScroll: true });
+    return;
+  }
   const qrow = e.target.closest('.qrow');
   if (qrow) {
     const k = qrow.dataset.q;
