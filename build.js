@@ -30,6 +30,13 @@ const OUT_BHTML = path.join(__dirname, 'buildings.html');
 const OUT_PORTRAITS = path.join(__dirname, 'portraits');
 const OUT_CARDS = path.join(__dirname, 'cards');
 const OUT_BPICS = path.join(__dirname, 'buildingpics');
+const REGIONS_TXT = path.join(MOD_ROOT, 'data', 'world', 'maps', 'base', 'descr_regions.txt');
+const STRAT_TXT = path.join(MOD_ROOT, 'data', 'world', 'maps', 'campaign', 'imperial_campaign', 'descr_strat.txt');
+const REGION_NAMES_TXT = path.join(MOD_ROOT, 'data', 'text', 'imperial_campaign_regions_and_settlement_names.txt');
+const RELIGIONS_TXT = path.join(MOD_ROOT, 'data', 'text', 'religions.txt');
+const REBELS_TXT = path.join(MOD_ROOT, 'data', 'descr_rebel_factions.txt');
+const REBELS_TEXT_TXT = path.join(MOD_ROOT, 'data', 'text', 'rebel_faction_descr.txt');
+const OUT_RHTML = path.join(__dirname, 'regions.html');
 const TRAITS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_character_traits.txt');
 const ANCS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_ancillaries.txt');
 const VNVS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_VnVs.txt');
@@ -1261,6 +1268,201 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
   return out;
 }
 
+// ------------------------------------------------------------ world: regions
+// descr_regions.txt: one block per province — settlement, rebel type, the
+// resource/hidden-resource token list, and the religion mix.
+function parseRegions(file) {
+  const blocks = [];
+  if (!fs.existsSync(file)) return [];
+  let cur = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0];
+    if (!t.trim()) continue;
+    if (!/^\s/.test(t)) { cur = { tag: t.trim(), lines: [] }; blocks.push(cur); continue; }
+    if (cur) cur.lines.push(t.trim());
+  }
+  return blocks.map((r) => {
+    const lines = r.lines.filter((l) => !/^legion:/.test(l));
+    const relLine = lines.find((l) => /^religions/.test(l)) || '';
+    const religions = {};
+    const relm = relLine.match(/\{([^}]*)\}/);
+    if (relm) {
+      const toks = relm[1].trim().split(/\s+/);
+      for (let i = 0; i + 1 < toks.length; i += 2) religions[toks[i]] = Number(toks[i + 1]);
+    }
+    return {
+      tag: r.tag,
+      settlement: lines[0] || '',
+      rebel: lines[2] || '',
+      traits: (lines[4] || '').split(',').map((s) => s.trim()).filter(Boolean),
+      religions,
+    };
+  }).filter((r) => r.settlement);
+}
+
+// descr_strat.txt: settlement blocks appear under the owning faction's
+// section — start owner, level, city/castle and starting population.
+function parseStrat(file) {
+  const byRegion = {};
+  if (!fs.existsSync(file)) return byRegion;
+  let fac = '';
+  let cur = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    if (!t) continue;
+    let m;
+    if ((m = t.match(/^faction\s+([a-z_]+)/))) { fac = m[1]; cur = null; continue; }
+    if (/^settlement\b/.test(t)) { cur = { owner: fac, castle: /castle/.test(t), level: '', pop: 0, region: '' }; continue; }
+    if (!cur) continue;
+    if ((m = t.match(/^level\s+(\w+)/))) cur.level = m[1];
+    else if ((m = t.match(/^region\s+(\w+)/))) cur.region = m[1];
+    else if ((m = t.match(/^population\s+(\d+)/))) cur.pop = Number(m[1]);
+    else if (t === '}') { if (cur.region) byRegion[cur.region] = cur; cur = null; }
+  }
+  return byRegion;
+}
+
+// descr_rebel_factions.txt: the insurgent type each region can spawn, with
+// its unit roster; display names in text/rebel_faction_descr.txt.
+function parseRebels(file) {
+  const out = {};
+  if (!fs.existsSync(file)) return out;
+  let cur = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    if (!t) continue;
+    let m;
+    if ((m = t.match(/^rebel_type\s+(\S+)/))) { cur = { id: m[1], descTag: '', units: [] }; out[m[1]] = cur; }
+    else if (cur && (m = t.match(/^description\s+(\S+)/))) cur.descTag = m[1];
+    else if (cur && (m = t.match(/^unit\s+(.+?)$/))) cur.units.push(m[1].trim());
+  }
+  return out;
+}
+
+// eopData garrisons.lua: the scripted defenders of 77 major settlements.
+function parseGarrisons() {
+  const file = path.join(EOP_SCRIPTS, 'Campaign', 'garrisons.lua');
+  const bySett = {};
+  if (!fs.existsSync(file)) return bySett;
+  const lua = fs.readFileSync(file, 'utf8');
+  for (const seg of lua.split(/garrisonedSettlement:new\s*\{/).slice(1)) {
+    const name = (seg.match(/name\s*=\s*"([^"]+)"/) || [])[1];
+    if (!name) continue;
+    const units = seg.slice(seg.indexOf('units')).split(/garrisonedUnit:new\s*\{/).slice(1)
+      .map((u) => ({
+        n: (u.match(/name\s*=\s*"([^"]+)"/) || [])[1] || '',
+        c: Number((u.match(/amount\s*=\s*(\d+)/) || [])[1] || 1),
+        e: Number((u.match(/experience\s*=\s*(\d+)/) || [])[1] || 0),
+      })).filter((u) => u.n);
+    if (units.length) bySett[name] = units;
+  }
+  return bySett;
+}
+
+// eopData minorSettlements.lua: the small scripted settlements the campaign
+// places outside the regular province list.
+function parseMinorSetts() {
+  const file = path.join(EOP_SCRIPTS, 'Campaign', 'minorSettlements.lua');
+  const out = [];
+  if (!fs.existsSync(file)) return out;
+  const consts = parseFactionConsts();
+  const lua = fs.readFileSync(file, 'utf8');
+  for (const seg of lua.split(/minorSettlements:new\s*\{/).slice(1)) {
+    const g = (re) => (seg.match(re) || [])[1];
+    const name = g(/localizedName\s*=\s*"([^"]+)"/) || g(/name\s*=\s*"([^"]+)"/);
+    if (!name) continue;
+    out.push({
+      name,
+      pop: Number(g(/startingPop\s*=\s*(\d+)/) || 0),
+      castle: /isCastle\s*=\s*true/.test(seg),
+      fac: consts[g(/sourceFaction\s*=\s*(F_\w+)\.name/) || ''] || '',
+      buildings: [...(g(/buildings\s*=\s*\{([\s\S]*?)\}/) || '').matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+    });
+  }
+  return out;
+}
+
+// eopData customLocations.lua: scripted landmarks; the tooltip carries the
+// in-game name and description ("The Forsaken Inn: ...").
+function parseLandmarks() {
+  const file = path.join(EOP_SCRIPTS, 'Custom_Locations', 'customLocations.lua');
+  const out = [];
+  if (!fs.existsSync(file)) return out;
+  const lua = fs.readFileSync(file, 'utf8');
+  for (const m of lua.matchAll(/tooltip\s*=\s*"((?:[^"\\]|\\.)*)"/g)) {
+    const txt = m[1].replace(/\\n/g, '\n').trim();
+    const i = txt.indexOf(':');
+    if (i < 2) continue;
+    out.push({ name: txt.slice(0, i).trim(), desc: txt.slice(i + 1).trim() });
+  }
+  return out;
+}
+
+// region resource tokens that are routing/engine flags, not lore
+const TRAIT_NOISE = new Set(['unlocked', 'roads', 'no_pirates', 'no_brigands', 'pirates',
+  'brigands', 'boats', 'no_boats', 'watercourse', 'coast', 'landbridge']);
+const TERRAINS = new Set(['forest', 'grassland', 'hills', 'mountains', 'desert',
+  'swamp', 'snow', 'tundra', 'fertile', 'wilderness']);
+const LEVEL_LABELS = { village: 'Village', town: 'Town', large_town: 'Large Town',
+  city: 'City', large_city: 'Large City', huge_city: 'Huge City' };
+
+function buildWorld(ownerMap, unitsByType) {
+  const rnames = parseExportUnits(REGION_NAMES_TXT);
+  const relNames = parseExportUnits(RELIGIONS_TXT);
+  const rebTexts = fs.existsSync(REBELS_TEXT_TXT) ? parseExportUnits(REBELS_TEXT_TXT) : {};
+  const regions = parseRegions(REGIONS_TXT);
+  const strat = parseStrat(STRAT_TXT);
+  const rebels = parseRebels(REBELS_TXT);
+  const garrisons = parseGarrisons();
+  const seen = new Set();
+  const slug = (base) => {
+    let s = base.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const root = s;
+    let n = 2;
+    while (seen.has(s)) s = root + '-' + n++;
+    seen.add(s);
+    return s;
+  };
+  const linkU = (n) => {
+    const u = unitsByType[n.trim().toLowerCase()];
+    return { n: u ? u.name : n, s: u ? u.slug : '' };
+  };
+  const out = [];
+  for (const r of regions) {
+    const st = strat[r.tag];
+    if (!st) continue; // off-map helper regions
+    const name = cleanText(rnames[r.settlement.toLowerCase()] || '') || r.settlement.replace(/_/g, ' ');
+    const reb = rebels[r.rebel];
+    const rels = Object.entries(r.religions).filter(([, p]) => p > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, p]) => ({ r: cleanText(relNames[k] || '') || k, p }));
+    out.push({
+      slug: slug(name),
+      name,
+      prov: cleanText(rnames[r.tag.toLowerCase()] || '') || r.tag.replace(/_Province$/i, '').replace(/_/g, ' '),
+      owner: st.owner === 'slave' ? 'Rebels' : st.owner === 'papal_states' ? 'Dark Lord of Mordor' : (ownerMap[st.owner] || st.owner),
+      castle: st.castle,
+      level: LEVEL_LABELS[st.level] || st.level,
+      pop: st.pop,
+      rels,
+      terrain: r.traits.filter((t) => TERRAINS.has(t)).join(', '),
+      traits: r.traits.filter((t) => !TERRAINS.has(t) && !TRAIT_NOISE.has(t) && !/^Res[A-Z]/.test(t))
+        .map((t) => t.replace(/_/g, ' ')),
+      rebel: reb ? {
+        n: cleanText(rebTexts[(reb.descTag || '').toLowerCase()] || '') || reb.id.replace(/_/g, ' '),
+        units: reb.units.map(linkU),
+      } : null,
+      garrison: (garrisons[r.settlement] || []).map((u) => ({ ...linkU(u.n), c: u.c, e: u.e })),
+    });
+  }
+  out.sort((a, b) => a.owner.localeCompare(b.owner) || a.name.localeCompare(b.name));
+  const minors = parseMinorSetts().map((s) => ({
+    name: s.name, pop: s.pop, castle: s.castle,
+    owner: s.fac ? (ownerMap[s.fac] || s.fac) : 'Rebels',
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  return { regions: out, minors, landmarks: parseLandmarks() };
+}
+
 // ------------------------------------------------ characters: traits & retinue
 // export_descr_character_traits.txt: traits (levels with point thresholds and
 // effects) plus the triggers that award the points. Display names and
@@ -1744,9 +1946,10 @@ function buildModel() {
 
   const factionPages = buildFactionsModel(units, ownerMap, unitsByType, edbChains, buildings, guilds, cultures);
   const characters = buildCharacters(ownerMap);
+  const world = buildWorld(ownerMap, unitsByType);
 
   return {
-    units, factions, projectiles, mounts, buildings, factionPages, characters,
+    units, factions, projectiles, mounts, buildings, factionPages, characters, world,
     missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
@@ -2169,7 +2372,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a></nav>
 </header>
 
 <div class="controls">
@@ -2974,7 +3177,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a></nav>
 </header>
 
 <div class="controls">
@@ -3499,7 +3702,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a></nav>
 </header>
 
 <main id="main"></main>
@@ -3897,7 +4100,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a></nav>
 </header>
 
 <div class="controls">
@@ -4055,6 +4258,367 @@ window.addEventListener('hashchange', openFromHash);
 `;
 }
 
+// ------------------------------------------------------------ world page html
+
+function buildWorldHtml(model) {
+  const regJson = JSON.stringify(model.world.regions);
+  const minJson = JSON.stringify(model.world.minors);
+  const lmJson = JSON.stringify(model.world.landmarks);
+  const generated = new Date().toISOString().slice(0, 10);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — World</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.35;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--parchment-dark);
+  border-bottom: 1px solid var(--line-dark);
+}
+.controls input[type="search"] {
+  font: inherit;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 5px 9px;
+  width: 220px;
+}
+.controls select {
+  font: inherit;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 5px 7px;
+  max-width: 210px;
+}
+.catbtns { display: flex; flex-wrap: wrap; gap: 4px; }
+.catbtns button {
+  font-family: var(--display);
+  font-size: 11.5px;
+  letter-spacing: .05em;
+  background: var(--parchment);
+  color: var(--ink-soft);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.catbtns button.active { background: var(--accent); border-color: var(--accent); color: #f6eeda; }
+.count { margin-left: auto; color: var(--ink-soft); font-size: 13.5px; font-style: italic; }
+main { max-width: 1050px; margin: 0 auto; padding: 12px 14px 60px; }
+table { border-collapse: collapse; width: 100%; }
+th {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 8px 8px 4px;
+  border-bottom: 2px solid var(--line-dark);
+}
+th.num { text-align: right; }
+tr.cat-row td {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--parchment-dark);
+  border: 1px solid var(--line-dark);
+  padding: 6px 10px;
+}
+tr.cat-row .fcount { float: right; font-weight: 400; font-size: 12px; color: var(--ink-soft); letter-spacing: .02em; text-transform: none; }
+tr.reg { cursor: pointer; }
+tr.reg:nth-child(even) { background: var(--row-alt); }
+tr.reg:hover { background: #efe6cd; }
+tr.reg.open { background: #f7f0dd; }
+tr.reg td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+td.name { font-weight: 600; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.soft { color: var(--ink-soft); font-size: 14px; }
+tr.detail td {
+  background: #faf3df;
+  border: 1px solid var(--line-dark);
+  border-top: none;
+  padding: 10px 16px 12px;
+}
+.sec { font-size: 14px; margin-top: 7px; max-width: 90ch; line-height: 1.5; }
+.sec > b {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-right: 6px;
+}
+.dim { color: var(--ink-soft); }
+a.unitlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+a.unitlink:hover { background: rgba(122,31,31,.08); }
+.relbar { display: inline-block; margin-right: 12px; }
+.flash td { animation: flash 1.6s ease-out 1; }
+@keyframes flash { 0% { background: #e8d49a; } 100% { background: #faf3df; } }
+h2.extra {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  text-align: center;
+  margin: 34px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-dark);
+  border-top: 2px solid var(--line-dark);
+  background: linear-gradient(90deg, var(--parchment-dark), #f0e7cf 40%, var(--parchment-dark));
+}
+.lmark { margin: 0 0 12px; }
+.lmark b { color: var(--accent); display: block; margin-bottom: 2px; }
+.lmark p { margin: 2px 0 6px; max-width: 80ch; line-height: 1.5; }
+.minors td { padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 40px 0; }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  .hide-xs { display: none; }
+  main { padding: 8px 6px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; World</h1>
+  <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a></nav>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search settlements &amp; provinces&hellip;" autocomplete="off">
+  <select id="own"><option value="">All owners</option></select>
+  <span class="catbtns" id="kinds">
+    <button data-kind="" class="active">All</button>
+    <button data-kind="city">Cities</button>
+    <button data-kind="castle">Castles</button>
+  </span>
+  <span class="count" id="count"></span>
+</div>
+
+<main>
+  <table>
+    <thead><tr>
+      <th>Settlement</th><th>Province</th><th>Type</th>
+      <th class="num hide-xs">Population</th><th class="hide-xs">Majority faith</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden>No settlements match these filters.</div>
+
+  <h2 class="extra">Minor settlements</h2>
+  <table class="minors"><tbody id="minors"></tbody></table>
+
+  <h2 class="extra">Landmarks</h2>
+  <div id="landmarks"></div>
+</main>
+
+<footer>Generated ${generated} from <code>descr_regions.txt</code>, <code>descr_strat.txt</code> &amp; the eopData campaign scripts &middot; ${model.world.regions.length} provinces &middot; starting ownership, faiths and garrisons as of turn one</footer>
+
+<script>
+const REG = ${regJson};
+const MIN = ${minJson};
+const LM = ${lmJson};
+REG.forEach((r, i) => { r.id = i; });
+const state = { q: '', own: '', kind: '', open: new Set() };
+
+const $own = document.getElementById('own');
+for (const o of [...new Set(REG.map(r => r.owner))]) {
+  const el = document.createElement('option');
+  el.value = o; el.textContent = o;
+  $own.appendChild(el);
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function matches(r) {
+  if (state.own && r.owner !== state.own) return false;
+  if (state.kind && (state.kind === 'castle') !== r.castle) return false;
+  if (state.q) {
+    const q = state.q.toLowerCase();
+    if (!(r.name + ' ' + r.prov + ' ' + r.owner + ' ' + r.traits.join(' ')).toLowerCase().includes(q)) return false;
+  }
+  return true;
+}
+
+function rowHtml(r) {
+  return '<tr class="reg' + (state.open.has(r.id) ? ' open' : '') + '" data-id="' + r.id + '">' +
+    '<td class="name">' + esc(r.name) + '</td>' +
+    '<td class="soft">' + esc(r.prov) + '</td>' +
+    '<td class="soft">' + (r.castle ? 'Castle' : 'City') + ' <span class="dim">(' + esc(r.level) + ')</span></td>' +
+    '<td class="num hide-xs">' + (r.pop ? r.pop.toLocaleString('en') : '—') + '</td>' +
+    '<td class="soft hide-xs">' + (r.rels[0] ? esc(r.rels[0].r) + ' <span class="dim">' + r.rels[0].p + '%</span>' : '—') + '</td>' +
+  '</tr>';
+}
+
+function ulink(u) {
+  return u.s ? '<a class="unitlink" href="index.html#' + u.s + '">' + esc(u.n) + '</a>' : esc(u.n);
+}
+
+function detailHtml(r) {
+  const parts = [];
+  const rels = r.rels.map(x => '<span class="relbar">' + esc(x.r) + ' <span class="dim">' + x.p + '%</span></span>').join('');
+  if (rels) parts.push('<div class="sec"><b>Faiths</b>' + rels + '</div>');
+  if (r.terrain) parts.push('<div class="sec"><b>Terrain</b>' + esc(r.terrain) + '</div>');
+  if (r.traits.length) parts.push('<div class="sec"><b>Regional traits</b>' + esc(r.traits.join(', ')) + '</div>');
+  if (r.garrison.length) {
+    parts.push('<div class="sec"><b>Scripted garrison</b>' +
+      r.garrison.map(u => ulink(u) + (u.c > 1 ? ' ×' + u.c : '') + (u.e ? ' <span class="dim">+' + u.e + ' exp</span>' : '')).join(', ') + '</div>');
+  }
+  if (r.rebel) {
+    parts.push('<div class="sec"><b>Local rebels</b>' + esc(r.rebel.n) +
+      (r.rebel.units.length ? ' <span class="dim">—</span> ' + r.rebel.units.map(ulink).join(', ') : '') + '</div>');
+  }
+  return '<tr class="detail"><td colspan="5">' + parts.join('') + '</td></tr>';
+}
+
+function render() {
+  const list = REG.filter(matches);
+  let html = '';
+  let lastOwner = null;
+  for (const r of list) {
+    if (r.owner !== lastOwner) {
+      lastOwner = r.owner;
+      const n = list.filter(x => x.owner === r.owner).length;
+      html += '<tr class="cat-row"><td colspan="5">' + esc(r.owner) + '<span class="fcount">' + n + (n === 1 ? ' settlement' : ' settlements') + '</span></td></tr>';
+    }
+    html += rowHtml(r);
+    if (state.open.has(r.id)) html += detailHtml(r);
+  }
+  document.getElementById('rows').innerHTML = html;
+  document.getElementById('empty').hidden = list.length > 0;
+  document.getElementById('count').textContent = list.length + ' of ' + REG.length + ' settlements';
+}
+
+document.getElementById('minors').innerHTML = MIN.map(s =>
+  '<tr><td class="name">' + esc(s.name) + '</td>' +
+  '<td class="soft">' + (s.castle ? 'Castle' : 'Village') + '</td>' +
+  '<td class="num">' + (s.pop ? s.pop.toLocaleString('en') : '—') + '</td>' +
+  '<td class="soft">' + esc(s.owner) + '</td></tr>').join('');
+document.getElementById('landmarks').innerHTML = LM.map(l =>
+  '<div class="lmark"><b>' + esc(l.name) + '</b><p>' + esc(l.desc) + '</p></div>').join('');
+
+document.getElementById('q').addEventListener('input', (e) => { state.q = e.target.value.trim(); render(); });
+$own.addEventListener('change', (e) => { state.own = e.target.value; render(); });
+document.getElementById('kinds').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  state.kind = btn.dataset.kind;
+  for (const x of document.querySelectorAll('#kinds button')) x.classList.toggle('active', x === btn);
+  render();
+});
+document.getElementById('rows').addEventListener('click', (e) => {
+  if (e.target.closest('a')) return;
+  const row = e.target.closest('tr.reg');
+  if (!row) return;
+  const id = Number(row.dataset.id);
+  if (state.open.has(id)) { state.open.delete(id); setHash(''); }
+  else { state.open.add(id); setHash(REG[id].slug); }
+  render();
+});
+
+function setHash(slug) {
+  history.replaceState(null, '', slug ? '#' + slug : location.pathname + location.search);
+}
+function openFromHash() {
+  const slug = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (!slug) return;
+  const r = REG.find(x => x.slug === slug);
+  if (!r || state.open.has(r.id)) return;
+  state.q = ''; state.own = ''; state.kind = '';
+  document.getElementById('q').value = '';
+  $own.value = '';
+  for (const x of document.querySelectorAll('#kinds button')) x.classList.toggle('active', x.dataset.kind === '');
+  state.open.add(r.id);
+  render();
+  const row = document.querySelector('tr.reg[data-id="' + r.id + '"]');
+  if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
+}
+if (location.hash) history.scrollRestoration = 'manual';
+render();
+openFromHash();
+window.addEventListener('hashchange', openFromHash);
+</script>
+</body>
+</html>
+`;
+}
+
 // ---------------------------------------------------------------------- run
 
 const model = buildModel();
@@ -4063,6 +4627,8 @@ fs.writeFileSync(OUT_BHTML, buildBuildingsHtml(model), 'utf8');
 fs.writeFileSync(OUT_FHTML, buildFactionsHtml(model), 'utf8');
 fs.writeFileSync(OUT_CHTML, buildCharactersHtml(model), 'utf8');
 console.log(`Characters page: ${model.characters.traits.length} traits, ${model.characters.ancs.length} retinue entries.`);
+fs.writeFileSync(OUT_RHTML, buildWorldHtml(model), 'utf8');
+console.log(`World page: ${model.world.regions.length} provinces, ${model.world.minors.length} minor settlements, ${model.world.landmarks.length} landmarks.`);
 
 // prune building pictures the model no longer references (default pics are
 // now culture-suffixed, orphaning the old unsuffixed exports)

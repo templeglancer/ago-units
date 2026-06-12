@@ -6,9 +6,12 @@ A self-contained website displaying every unit in the AGO mod, with names,
 descriptions, and battle stats merged from the mod's data files. Companion
 pages: **buildings.html** (every building chain and guild, with a settlement
 tech-tree view), **factions.html** (campaign overviews and questlines for all
-26 playable factions) and **characters.html** (every visible character trait
+26 playable factions), **characters.html** (every visible character trait
 with its level thresholds, effects and earning triggers, plus the full
-retinue of followers and items).
+retinue of followers and items) and **regions.html** (the world atlas: all
+198 provinces with starting owner, settlement type and population, religion
+mix, regional traits, scripted garrisons and local rebel forces, plus the
+minor settlements and scripted landmarks).
 
 ## Viewing
 
