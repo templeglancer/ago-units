@@ -37,6 +37,8 @@ const RELIGIONS_TXT = path.join(MOD_ROOT, 'data', 'text', 'religions.txt');
 const REBELS_TXT = path.join(MOD_ROOT, 'data', 'descr_rebel_factions.txt');
 const REBELS_TEXT_TXT = path.join(MOD_ROOT, 'data', 'text', 'rebel_faction_descr.txt');
 const OUT_RHTML = path.join(__dirname, 'regions.html');
+const HISTEV_TXT = path.join(MOD_ROOT, 'data', 'text', 'historic_events.txt');
+const OUT_AHTML = path.join(__dirname, 'annals.html');
 const TRAITS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_character_traits.txt');
 const ANCS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_ancillaries.txt');
 const VNVS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_VnVs.txt');
@@ -1527,6 +1529,64 @@ function buildWorld(ownerMap, unitsByType) {
   return { regions: out, minors, landmarks: parseLandmarks() };
 }
 
+// ------------------------------------------------------------ annals: events
+// text/historic_events.txt: the 560 event scrolls the campaign can show,
+// as {TAG_TITLE}/{TAG_BODY} pairs. The owning faction is recoverable from
+// the vanilla-tag tokens inside the tag name (RING_FOUND_SICILY -> Gondor).
+function buildAnnals(ownerMap) {
+  const ev = fs.existsSync(HISTEV_TXT) ? parseExportUnits(HISTEV_TXT) : {};
+  // many tag names use lore tokens rather than vanilla tags (MORDOR_..., not
+  // england_...): map unambiguous words of the display names back to factions
+  const dispTok = {};
+  const tokCount = {};
+  for (const disp of new Set(Object.values(ownerMap))) {
+    for (const w of disp.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z]+/)) {
+      if (w.length < 4) continue;
+      tokCount[w] = (tokCount[w] || 0) + 1;
+      dispTok[w] = disp;
+    }
+  }
+  for (const w of Object.keys(tokCount)) if (tokCount[w] > 1) delete dispTok[w];
+  const events = [];
+  for (const key of Object.keys(ev)) {
+    if (!key.endsWith('_title')) continue;
+    const base = key.slice(0, -6);
+    const t = cleanText(ev[key] || '');
+    const d = cleanText(ev[base + '_body'] || '');
+    if (!t || !d || !/[a-zA-Z]/.test(t)) continue; // placeholder titles
+    const toks = base.split('_');
+    let fac = '';
+    for (let i = 0; i < toks.length && !fac; i++) {
+      fac = ownerMap[toks[i]] || ownerMap[toks[i] + '_' + (toks[i + 1] || '')] || dispTok[toks[i]] || '';
+    }
+    events.push({ t, d, f: fac });
+  }
+  events.sort((a, b) => (a.f || '').localeCompare(b.f || '') || a.t.localeCompare(b.t));
+  // eopData disasters.lua: the natural-calamity scrolls with their quotes
+  const disasters = [];
+  const dFile = path.join(EOP_SCRIPTS, 'Campaign', 'disasters.lua');
+  if (fs.existsSync(dFile)) {
+    const lua = fs.readFileSync(dFile, 'utf8');
+    for (const seg of lua.split(/\[WORLD\.disasters\.(\w+)\]\s*=\s*\{/g).slice(1).reduce((acc, cur, i, arr) => {
+      if (i % 2 === 0) acc.push([cur, arr[i + 1] || '']);
+      return acc;
+    }, [])) {
+      const [name, body] = seg;
+      const g = (re) => (body.match(re) || [])[1] || '';
+      const title = g(/title\s*=\s*"([^"]*)"/);
+      if (!title) continue;
+      disasters.push({
+        n: name,
+        t: title,
+        d: g(/text\s*=\s*"((?:[^"\\]|\\.)*)"/).replace(/\\n/g, '\n'),
+        q: g(/quote\s*=\s*"((?:[^"\\]|\\.)*)"/),
+        a: g(/quoteAuthor\s*=\s*"((?:[^"\\]|\\.)*)"/).replace(/^-\s*/, ''),
+      });
+    }
+  }
+  return { events, disasters };
+}
+
 // ------------------------------------------------ characters: traits & retinue
 // export_descr_character_traits.txt: traits (levels with point thresholds and
 // effects) plus the triggers that award the points. Display names and
@@ -2125,9 +2185,10 @@ function buildModel() {
   const factionPages = buildFactionsModel(units, ownerMap, unitsByType, edbChains, buildings, guilds, cultures);
   const characters = buildCharacters(ownerMap, cultures, unitsByType);
   const world = buildWorld(ownerMap, unitsByType);
+  const annals = buildAnnals(ownerMap);
 
   return {
-    units, factions, projectiles, mounts, buildings, factionPages, characters, world,
+    units, factions, projectiles, mounts, buildings, factionPages, characters, world, annals,
     missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
@@ -2550,7 +2611,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
 </header>
 
 <div class="controls">
@@ -3355,7 +3416,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
 </header>
 
 <div class="controls">
@@ -3881,7 +3942,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4288,7 +4349,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
 </header>
 
 <div class="controls">
@@ -4700,7 +4761,7 @@ footer {
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a></nav>
 </header>
 
 <div class="controls">
@@ -4864,6 +4925,270 @@ window.addEventListener('hashchange', openFromHash);
 `;
 }
 
+// ------------------------------------------------------------ annals page html
+
+function buildAnnalsHtml(model) {
+  const evJson = JSON.stringify(model.annals.events);
+  const diJson = JSON.stringify(model.annals.disasters);
+  const generated = new Date().toISOString().slice(0, 10);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Annals</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.35;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--parchment-dark);
+  border-bottom: 1px solid var(--line-dark);
+}
+.controls input[type="search"] {
+  font: inherit;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 5px 9px;
+  width: 230px;
+}
+.controls select {
+  font: inherit;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 5px 7px;
+  max-width: 220px;
+}
+.count { margin-left: auto; color: var(--ink-soft); font-size: 13.5px; font-style: italic; }
+main { max-width: 950px; margin: 0 auto; padding: 12px 14px 60px; }
+h2.fac {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--parchment-dark);
+  border: 1px solid var(--line-dark);
+  margin: 18px 0 4px;
+  padding: 6px 10px;
+}
+h2.fac .fcount { float: right; font-weight: 400; font-size: 12px; color: var(--ink-soft); letter-spacing: .02em; text-transform: none; }
+.ev { border-bottom: 1px dotted var(--line); }
+.erow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 2px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.erow .emark { flex: none; color: var(--gold); font-size: 12px; transform: translateY(-1px); }
+.erow .etitle { font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .02em; }
+.erow .eleader { flex: 1; min-width: 30px; border-bottom: 2px dotted rgba(139,115,71,.5); transform: translateY(-4px); }
+.erow .etoggle { flex: none; width: 14px; text-align: center; color: var(--ink-soft); font-size: 15px; }
+.erow:hover .etitle { color: var(--accent); }
+.erow:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
+.ev.eopen .etitle { color: var(--accent); }
+.ebody { padding: 2px 26px 12px; }
+.ebody p { margin: 2px 0 8px; max-width: 66ch; line-height: 1.5; }
+.ebody .quote { font-style: italic; color: var(--ink-soft); }
+.dim { color: var(--ink-soft); }
+h2.extra {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  text-align: center;
+  margin: 34px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-dark);
+  border-top: 2px solid var(--line-dark);
+  background: linear-gradient(90deg, var(--parchment-dark), #f0e7cf 40%, var(--parchment-dark));
+}
+.empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 40px 0; }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  main { padding: 8px 6px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Annals</h1>
+  <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a></nav>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search events&hellip;" autocomplete="off">
+  <select id="fac"><option value="">All factions</option></select>
+  <span class="count" id="count"></span>
+</div>
+
+<main>
+  <div id="list"></div>
+  <div class="empty" id="empty" hidden>No events match this search.</div>
+
+  <h2 class="extra">Calamities</h2>
+  <div id="disasters"></div>
+</main>
+
+<footer>Generated ${generated} from <code>historic_events.txt</code> &amp; the eopData disaster scripts &middot; ${model.annals.events.length} event scrolls &middot; events fire when their campaign conditions are met</footer>
+
+<script>
+const EV = ${evJson};
+const DI = ${diJson};
+EV.forEach((e, i) => { e.id = i; });
+const state = { q: '', fac: '', open: new Set() };
+
+const $fac = document.getElementById('fac');
+for (const f of [...new Set(EV.map(e => e.f).filter(Boolean))].sort()) {
+  const o = document.createElement('option');
+  o.value = f; o.textContent = f;
+  $fac.appendChild(o);
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function matches(e) {
+  if (state.fac && e.f !== state.fac) return false;
+  if (state.q && !(e.t + ' ' + e.d).toLowerCase().includes(state.q.toLowerCase())) return false;
+  return true;
+}
+
+function evHtml(e) {
+  const isOpen = state.open.has(e.id);
+  return '<div class="ev' + (isOpen ? ' eopen' : '') + '">' +
+    '<button class="erow" data-id="' + e.id + '" aria-expanded="' + isOpen + '">' +
+      '<span class="emark">&#10022;</span>' +
+      '<span class="etitle">' + esc(e.t) + '</span>' +
+      '<span class="eleader"></span>' +
+      '<span class="etoggle">' + (isOpen ? '&minus;' : '+') + '</span>' +
+    '</button>' +
+    (isOpen ? '<div class="ebody">' +
+      e.d.split(/\\n{2,}/).map(p => '<p>' + esc(p).replace(/\\n/g, '<br>') + '</p>').join('') +
+    '</div>' : '') +
+  '</div>';
+}
+
+function render() {
+  const list = EV.filter(matches);
+  let html = '';
+  let last = null;
+  for (const e of list) {
+    const grp = e.f || 'General campaign';
+    if (grp !== last) {
+      last = grp;
+      const n = list.filter(x => (x.f || 'General campaign') === grp).length;
+      html += '<h2 class="fac">' + esc(grp) + '<span class="fcount">' + n + (n === 1 ? ' event' : ' events') + '</span></h2>';
+    }
+    html += evHtml(e);
+  }
+  document.getElementById('list').innerHTML = html;
+  document.getElementById('empty').hidden = list.length > 0;
+  document.getElementById('count').textContent = list.length + ' of ' + EV.length + ' events';
+}
+
+document.getElementById('disasters').innerHTML = DI.map(d =>
+  '<div class="ev"><div class="erow" style="cursor:default">' +
+    '<span class="emark">&#10070;</span><span class="etitle">' + esc(d.t) + '</span>' +
+    '<span class="eleader"></span></div>' +
+  '<div class="ebody">' +
+    (d.d && d.d.length > 20 ? '<p>' + esc(d.d) + '</p>' : '') +
+    (d.q ? '<p class="quote">' + esc(d.q) + (d.a ? ' <span class="dim">&mdash; ' + esc(d.a) + '</span>' : '') + '</p>' : '') +
+  '</div></div>').join('');
+
+document.getElementById('q').addEventListener('input', (e) => { state.q = e.target.value.trim(); render(); });
+$fac.addEventListener('change', (e) => { state.fac = e.target.value; render(); });
+document.getElementById('list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.erow');
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  if (state.open.has(id)) state.open.delete(id); else state.open.add(id);
+  render();
+  const again = document.querySelector('.erow[data-id="' + id + '"]');
+  if (again) again.focus({ preventScroll: true });
+});
+render();
+</script>
+</body>
+</html>
+`;
+}
+
 // ---------------------------------------------------------------------- run
 
 const model = buildModel();
@@ -4874,6 +5199,8 @@ fs.writeFileSync(OUT_CHTML, buildCharactersHtml(model), 'utf8');
 console.log(`Characters page: ${model.characters.traits.length} traits, ${model.characters.ancs.length} retinue entries.`);
 fs.writeFileSync(OUT_RHTML, buildWorldHtml(model), 'utf8');
 console.log(`World page: ${model.world.regions.length} provinces, ${model.world.minors.length} minor settlements, ${model.world.landmarks.length} landmarks.`);
+fs.writeFileSync(OUT_AHTML, buildAnnalsHtml(model), 'utf8');
+console.log(`Annals page: ${model.annals.events.length} event scrolls, ${model.annals.disasters.length} calamities.`);
 
 // prune building pictures the model no longer references (default pics are
 // now culture-suffixed, orphaning the old unsuffixed exports)

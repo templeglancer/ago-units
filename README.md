@@ -13,7 +13,9 @@ Nazgul with dread, traits, relics, bodyguards and respawn rules, plus all
 scripted battle abilities with effects and earning requirements) and **regions.html** (the world atlas: all
 198 provinces with starting owner, settlement type and population, religion
 mix, regional traits, scripted garrisons and local rebel forces, plus the
-minor settlements and scripted landmarks).
+minor settlements and scripted landmarks) and **annals.html** (all 557
+event scrolls the campaign can show, grouped by faction with search, plus
+the natural-calamity scrolls).
 
 ## Viewing
 
