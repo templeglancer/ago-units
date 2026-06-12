@@ -2677,7 +2677,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -3482,7 +3482,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4008,7 +4008,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4415,7 +4415,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4827,7 +4827,7 @@ footer {
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5153,7 +5153,7 @@ footer {
 <header>
   <h1>AGO &mdash; Annals</h1>
   <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5250,6 +5250,194 @@ document.getElementById('list').addEventListener('click', (e) => {
 });
 render();
 </script>
+</body>
+</html>
+`;
+}
+
+// ------------------------------------------------------------ about & quotes
+
+// data/text/quotes.txt: 850 Tolkien loading-screen quotes; a sample rides in
+// every page footer, picked at random on each visit.
+function buildQuotes() {
+  const file = path.join(MOD_ROOT, 'data', 'text', 'quotes.txt');
+  if (!fs.existsSync(file)) return [];
+  const t = parseExportUnits(file);
+  const out = [];
+  for (let i = 1; i <= 850; i += 9) { // a ~95-quote sample keeps pages light
+    const q = cleanText(t['quote_' + i] || '');
+    const a = cleanText(t['author_' + i] || '');
+    if (q) out.push({ q, a });
+  }
+  return out;
+}
+
+// Minimal Markdown for the team's docs: headings, two-level bullets, bold.
+function mdHtml(md) {
+  const mdesc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (s) => mdesc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\*([^*]+)\*/g, '<i>$1</i>');
+  const lines = md.replace(/\r/g, '').split('\n');
+  let html = '';
+  let depth = 0;
+  const closeTo = (d) => { while (depth > d) { html += '</ul>'; depth--; } };
+  for (const line of lines) {
+    let m;
+    if ((m = line.match(/^(#{1,4})\s+(.*)$/))) {
+      closeTo(0);
+      const h = Math.min(m[1].length + 1, 4);
+      html += '<h' + h + '>' + inline(m[2]) + '</h' + h + '>';
+    } else if ((m = line.match(/^(\s*)[-*]\s+(.*)$/))) {
+      const d = Math.floor(m[1].length / 2) + 1;
+      while (depth < d) { html += '<ul>'; depth++; }
+      closeTo(d);
+      html += '<li>' + inline(m[2]) + '</li>';
+    } else if (!line.trim()) {
+      closeTo(0);
+    } else {
+      closeTo(0);
+      html += '<p>' + inline(line.trim()) + '</p>';
+    }
+  }
+  closeTo(0);
+  return html;
+}
+
+function buildAboutHtml() {
+  const rd = (f) => fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+  // the docs carry their own top heading; the page supplies its own
+  const stripH1 = (s) => s.replace(/^#+ .*\r?\n/, '');
+  const changelog = stripH1(rd(path.join(MOD_ROOT, 'docs', 'Changelog.md')));
+  const credits = stripH1(rd(path.join(MOD_ROOT, 'docs', 'Credits.md')));
+  const generated = new Date().toISOString().slice(0, 10);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — About</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+main { max-width: 840px; margin: 0 auto; padding: 16px 14px 60px; }
+.toc {
+  text-align: center;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin: 6px 0 18px;
+}
+.toc a { color: var(--ink-soft); text-decoration: none; padding: 2px 8px; }
+.toc a:hover { color: var(--accent); }
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 2px solid var(--line-dark);
+  padding-bottom: 4px;
+  margin: 34px 0 10px;
+}
+h3, h4 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 16px 0 4px;
+}
+p { margin: 0 0 8px; max-width: 75ch; }
+ul { margin: 2px 0 10px; padding-left: 22px; max-width: 75ch; }
+li { margin: 0 0 3px; }
+a.x { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  main { padding: 8px 10px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; About</h1>
+  <p class="sub">The mod, its makers and its history &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html" class="active">About</a></nav>
+</header>
+
+<main>
+<nav class="toc"><a href="#site">This site</a> &middot; <a href="#credits">Credits</a> &middot; <a href="#changelog">Release notes</a></nav>
+
+<h2 id="site">This site</h2>
+<p>The AGO Compendium is generated directly from the mod's own data files &mdash; every stat,
+threshold, trigger and scroll on these pages is read from the same files the game reads, and the
+whole site is rebuilt with one command after each mod update. The single exception is the combat
+primer on the <a class="x" href="mechanics.html">Mechanics page</a>, which reflects
+community-established engine knowledge.</p>
+
+<h2 id="credits">Credits</h2>
+${mdHtml(credits)}
+
+<h2 id="changelog">Release notes</h2>
+${mdHtml(changelog)}
+
+</main>
+
+<footer>Generated ${generated} from <code>docs/Changelog.md</code> &amp; <code>docs/Credits.md</code></footer>
 </body>
 </html>
 `;
@@ -5447,7 +5635,7 @@ footer {
 <header>
   <h1>AGO &mdash; Mechanics</h1>
   <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -5543,16 +5731,30 @@ ${cfgRows}
 // ---------------------------------------------------------------------- run
 
 const model = buildModel();
-fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
-fs.writeFileSync(OUT_BHTML, buildBuildingsHtml(model), 'utf8');
-fs.writeFileSync(OUT_FHTML, buildFactionsHtml(model), 'utf8');
-fs.writeFileSync(OUT_CHTML, buildCharactersHtml(model), 'utf8');
+
+// every page carries a random Tolkien loading-screen quote in its footer
+const loreQuotes = buildQuotes();
+const QUOTE_SNIPPET = '<script>(function(){var LQ=' + JSON.stringify(loreQuotes) +
+  ';var p=LQ[Math.floor(Math.random()*LQ.length)];var el=document.getElementById("lq");' +
+  'if(el&&p)el.innerHTML="<i>"+p.q+"</i>"+(p.a?" &mdash; "+p.a:"");})();</scr' + 'ipt>';
+const withQuote = (html) => loreQuotes.length
+  ? html.replace('</footer>', '<div id="lq" style="margin-top:7px"></div></footer>')
+    .replace('</body>', QUOTE_SNIPPET + '\n</body>')
+  : html;
+const writePage = (file, html) => fs.writeFileSync(file, withQuote(html), 'utf8');
+
+writePage(OUT_HTML, buildHtml(model));
+writePage(OUT_BHTML, buildBuildingsHtml(model));
+writePage(OUT_FHTML, buildFactionsHtml(model));
+writePage(OUT_CHTML, buildCharactersHtml(model));
 console.log(`Characters page: ${model.characters.traits.length} traits, ${model.characters.ancs.length} retinue entries.`);
-fs.writeFileSync(OUT_RHTML, buildWorldHtml(model), 'utf8');
+writePage(OUT_RHTML, buildWorldHtml(model));
 console.log(`World page: ${model.world.regions.length} provinces, ${model.world.minors.length} minor settlements, ${model.world.landmarks.length} landmarks.`);
-fs.writeFileSync(OUT_AHTML, buildAnnalsHtml(model), 'utf8');
+writePage(OUT_AHTML, buildAnnalsHtml(model));
 console.log(`Annals page: ${model.annals.events.length} event scrolls, ${model.annals.disasters.length} calamities.`);
-fs.writeFileSync(path.join(__dirname, 'mechanics.html'), buildMechanicsHtml(model), 'utf8');
+writePage(path.join(__dirname, 'mechanics.html'), buildMechanicsHtml(model));
+writePage(path.join(__dirname, 'about.html'), buildAboutHtml());
+console.log('About page: changelog + credits rendered.');
 console.log(`Mechanics page: ${model.mechanics.cfg.length} settings, ${model.mechanics.palantir.stones.length} palantiri, ${model.mechanics.ring.stages.length} ring stages.`);
 
 // prune building pictures the model no longer references (default pics are
