@@ -198,7 +198,7 @@ function cardHtml(f) {
   }
   return '<div class="fcard' + (open.has(f.id) ? ' open' : '') + '" data-id="' + f.id + '">' +
     '<div class="fhead">' +
-    (f.sym ? '<img loading="lazy" alt="" src="' + f.sym + '">' : '') +
+    (f.sym ? '<img alt="" src="' + f.sym + '">' : '') +
     '<div><div class="fname">' + esc(f.name) + '</div>' +
     (meta ? '<div class="fmeta">' + esc(meta) + '</div>' : '') + '</div>' +
     '<div class="fnum">' + c.total + ' units</div>' +
