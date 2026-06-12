@@ -145,6 +145,9 @@ needed beyond Node.
   overview in `eopData/.../factionOverviews.lua`) — rendered as a chronicle
   index: scannable title rows with dotted leaders, each unfolding the mod
   team's description of triggers, choices and rewards on demand
+- Victory conditions (long and short campaign, with province and faction
+  names resolved) and the faction's named starting heroes (role, age, and a
+  star for those carrying a scripted battle ability) on every faction card
 - Chronicles & events: below the questlines, the in-game scroll texts and
   event popups from each faction's campaign scripts (`Faction_Scripts/`,
   only the files agoV3.lua actually loads) — 62 quest announcements,

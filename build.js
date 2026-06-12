@@ -761,6 +761,56 @@ function parseFactionLore() {
   return byTag;
 }
 
+// descr_win_conditions.txt: per faction, the long- and short-campaign goals
+// (hold these provinces, take N regions, outlive these factions).
+function parseWinConditions(file) {
+  const out = {};
+  if (!fs.existsSync(file)) return out;
+  let cur = null;
+  let mode = 'long';
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    if (!t) continue;
+    let m;
+    if (/^[a-z_]+$/.test(t) && !/^(hold_regions|take_regions|outlive|short_campaign|scripts)$/.test(t)) {
+      cur = { long: { hold: [], take: 0, outlive: [] }, short: { hold: [], take: 0, outlive: [] } };
+      out[t] = cur;
+      mode = 'long';
+      continue;
+    }
+    if (!cur) continue;
+    let line = t;
+    if (/^short_campaign\b/.test(line)) { mode = 'short'; line = line.replace(/^short_campaign\s*/, ''); }
+    if ((m = line.match(/^hold_regions\s+(.*)$/))) cur[mode].hold = m[1].trim().split(/\s+/);
+    else if ((m = line.match(/^take_regions\s+(\d+)/))) cur[mode].take = Number(m[1]);
+    else if ((m = line.match(/^outlive\s+(.*)$/))) cur[mode].outlive = m[1].trim().split(/\s+/);
+  }
+  return out;
+}
+
+// descr_strat.txt named characters: each faction's starting heroes with role,
+// age and whether they carry a scripted battle ability.
+function parseStratHeroes(file) {
+  const byFac = {};
+  if (!fs.existsSync(file)) return byFac;
+  let fac = '';
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    if (!t) continue;
+    let m;
+    if ((m = t.match(/^faction\s+([a-z_]+)/))) { fac = m[1]; continue; }
+    if ((m = t.match(/^character\s+([^,]+),\s*named character\s*,\s*\w+\s*,\s*(?:(leader|heir)\s*,\s*)?age\s+(\d+)/))) {
+      (byFac[fac] = byFac[fac] || []).push({
+        n: m[1].trim(),
+        r: m[2] || '',
+        age: Number(m[3]),
+        h: /hero_ability/.test(t),
+      });
+    }
+  }
+  return byFac;
+}
+
 // Faction overview model: campaign_descriptions.txt blurbs + factionData.lua
 // tiers + roster counts from the unit model.
 function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, guilds, cultures) {
@@ -768,6 +818,18 @@ function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, gui
   const chainBySlug = new Map(buildings.map((b) => [b.slug, b]));
   const overviews = parseFactionOverviews();
   const loreByTag = parseFactionLore();
+  const winCond = parseWinConditions(path.join(path.dirname(STRAT_TXT), 'descr_win_conditions.txt'));
+  const heroesByFac = parseStratHeroes(STRAT_TXT);
+  const provNames = parseExportUnits(REGION_NAMES_TXT);
+  const provName = (p) => cleanText(provNames[p.toLowerCase()] || '') || p.replace(/_Province$/i, '').replace(/_/g, ' ');
+  const wcTxt = (c) => {
+    if (!c) return '';
+    const parts = [];
+    if (c.hold.length) parts.push('hold ' + c.hold.map(provName).join(', '));
+    if (c.take) parts.push('control ' + c.take + ' regions');
+    if (c.outlive.length) parts.push('outlive ' + c.outlive.map((t) => ownerMap[t] || t).join(', '));
+    return parts.join(' · ');
+  };
   const cdesc = parseExportUnits(CAMPAIGN_DESCR_TXT);
   const facLua = parseFactionLua();
   const sectionOrder = [...new Set(units.map((u) => u.faction))];
@@ -825,6 +887,8 @@ function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, gui
       low: linkify(lua.low), mid: linkify(lua.mid), high: linkify(lua.high),
       quests: overviews[tag] || [],
       lore: loreByTag[tag] || [],
+      wc: winCond[tag] ? { l: wcTxt(winCond[tag].long), s: wcTxt(winCond[tag].short) } : { l: '', s: '' },
+      heroes: heroesByFac[tag] || [],
       descr,
     });
   }
@@ -3628,6 +3692,7 @@ h2.side.evil { color: var(--bad); }
 }
 .fbody p { margin: 0 0 8px; max-width: 66ch; line-height: 1.5; }
 .fbody .quote { font-style: italic; color: var(--ink-soft); }
+.fbody .hstar { color: var(--gold); margin-left: 3px; font-size: 13px; }
 .fbody .morebtn {
   background: none;
   border: 0;
@@ -3832,6 +3897,12 @@ function cardHtml(f) {
       '<div class="cols"><div class="col">' + descrHtml(f) + '</div>' +
       '<div class="col">' +
       (f.heir ? '<h3>Heir</h3><p>' + esc(f.heir) + '</p>' : '') +
+      (f.wc.l ? '<h3>Victory conditions</h3><p>' + esc(f.wc.l) +
+        (f.wc.s ? '<br><span class="dim">Short campaign: ' + esc(f.wc.s) + '</span>' : '') + '</p>' : '') +
+      (f.heroes.length ? '<h3>Starting heroes</h3><p>' + f.heroes.map(h =>
+        esc(h.n) + ' <span class="dim">(' + (h.r ? h.r + ', ' : '') + h.age + ')</span>' +
+        (h.h ? '<span class="hstar" title="Carries a scripted battle ability">&#10022;</span>' : '')
+      ).join(', ') + '</p>' : '') +
       '<h3>Roster (' + c.total + ' units)</h3><p>' + breakdown + '</p>' +
       smithHtml(f) +
       (f.low.length ? '<h3>Early units</h3><p>' + tierLine(f.low) + '</p>' : '') +
