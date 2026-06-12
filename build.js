@@ -868,11 +868,45 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
     const owner = uniqueTags.length === 1 ? uniqueTags[0] : '';
     const culture = (owner && cultures[owner]) || '';
     const guild = guilds[chain.name];
+    const allTags = Object.keys(ownerMap);
     const levels = chain.levels.map((l) => {
       const picByCulture = picIndex[l.level.toLowerCase()] || {};
       const tga = picByCulture[culture] || Object.values(picByCulture)[0] || '';
+      const defName = buildingDisplayName(bnames, l.level, culture, owner);
+      const defPic = tga ? exportImage(tga, l.level, OUT_BPICS, 'buildingpics') : '';
+      // Shared chains carry per-culture names and pictures (Isengard's version
+      // of a chain isn't called what Gondor's is); store only the variants
+      // that differ from the default, keyed by faction display name.
+      const names = {};
+      const pics = {};
+      const candTags = l.facs.filter((t) => ownerMap[t]);
+      for (const t of (candTags.length ? candTags : allTags)) {
+        const c = cultures[t] || '';
+        const disp = ownerMap[t];
+        const vName = buildingDisplayName(bnames, l.level, c, t);
+        if (vName !== defName) names[disp] = vName;
+        const vTga = picByCulture[c];
+        if (vTga && vTga !== tga) {
+          const vPic = exportImage(vTga, `${l.level}_${c}`, OUT_BPICS, 'buildingpics');
+          if (vPic && vPic !== defPic) pics[disp] = vPic;
+        }
+      }
+      // merge recruit pools by unit, tracking which factions get it
+      // (f = null means every owner of the building can recruit it)
+      const rec = new Map();
+      for (const r of l.recruits) {
+        const u = unitsByType[r.unit.trim().toLowerCase()];
+        const key = u ? u.name : r.unit;
+        const rf = r.facs.map((t) => ownerMap[t]).filter(Boolean);
+        const e = rec.get(key);
+        if (!e) rec.set(key, { n: key, s: u ? u.slug : '', exp: r.exp, f: r.facs.length ? new Set(rf) : null });
+        else if (e.f) {
+          if (!r.facs.length) e.f = null;
+          else for (const f of rf) e.f.add(f);
+        }
+      }
       return {
-        name: buildingDisplayName(bnames, l.level, culture, owner),
+        name: defName, names, pics,
         kind: l.kind, tier: l.tier, of: l.of,
         cost: l.cost, time: l.time,
         min: l.min.replace(/_/g, ' '),
@@ -880,19 +914,11 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
         ev: l.ev.map((e) => e.replace(/_/g, ' ')),
         facs: facNames(l.facs),
         effects: aggregateEffects(l.effects),
-        recruits: l.recruits.map((r) => {
-          const u = unitsByType[r.unit.trim().toLowerCase()];
-          return { n: u ? u.name : r.unit, s: u ? u.slug : '', exp: r.exp };
-        }),
+        recruits: [...rec.values()].map((r) => ({ ...r, f: r.f ? [...r.f].sort() : [] })),
         points: guild ? guild.points[l.tier - 1] : null,
-        pic: tga ? exportImage(tga, l.level, OUT_BPICS, 'buildingpics') : '',
+        pic: defPic,
       };
     });
-    // de-duplicate recruit names within a level (multiple pools per unit)
-    for (const l of levels) {
-      const seen = new Set();
-      l.recruits = l.recruits.filter((r) => !seen.has(r.n) && seen.add(r.n));
-    }
     const first = levels[0];
     // placeholder "names" (script-quest helpers like green_book_*) keep their
     // raw underscores — real localized names never do
@@ -2356,6 +2382,16 @@ tr.detail td {
   color: var(--ink-soft);
   margin-right: 6px;
 }
+.rgrp { margin: 2px 0 2px 8px; }
+.rfac {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-right: 6px;
+}
 .cond { border-bottom: 1px dotted var(--line-dark); cursor: help; }
 .ghow { margin: 4px 0 10px; padding: 8px 12px; background: rgba(138,109,47,.07); border: 1px solid var(--line); border-radius: 3px; max-width: 80ch; }
 .ghow > b {
@@ -2478,7 +2514,7 @@ function matches(b) {
   if (state.fac && b.facs.length && !b.facs.includes(state.fac)) return false;
   if (state.q) {
     const q = state.q.toLowerCase();
-    const hay = (b.name + ' ' + b.levels.map(l => l.name).join(' ') + ' ' + b.facs.join(' ') + ' ' + b.guild).toLowerCase();
+    const hay = (b.name + ' ' + b.levels.map(l => l.name + ' ' + Object.values(l.names).join(' ')).join(' ') + ' ' + b.facs.join(' ') + ' ' + b.guild).toLowerCase();
     if (!hay.includes(q)) return false;
   }
   return true;
@@ -2492,33 +2528,66 @@ function costRange(b) {
 }
 
 function rowHtml(b) {
-  const pic = b.pic ? '<img class="bpic" loading="lazy" alt="" src="' + b.pic + '">' : '';
-  const facs = b.facs.length ? (b.facs.length > 4 ? b.facs.slice(0, 4).join(', ') + ' +' + (b.facs.length - 4) : b.facs.join(', ')) : 'All factions';
+  const first = b.levels.filter(lvlVisible)[0] || b.levels[0];
+  const rpic = lvlPic(first);
+  const pic = rpic ? '<img class="bpic" loading="lazy" alt="" src="' + rpic + '">' : '';
+  const facs = state.fac ? (b.facs.length ? state.fac : 'All factions')
+    : b.facs.length ? (b.facs.length > 4 ? b.facs.slice(0, 4).join(', ') + ' +' + (b.facs.length - 4) : b.facs.join(', ')) : 'All factions';
   return '<tr class="bld' + (state.open.has(b.id) ? ' open' : '') + '" data-id="' + b.id + '">' +
-    '<td class="name">' + pic + esc(b.name) + (b.guild ? '<span class="guildtag">guild</span>' : '') + '</td>' +
+    '<td class="name">' + pic + esc(lvlName(first)) + (b.guild ? '<span class="guildtag">guild</span>' : '') + '</td>' +
     '<td class="num">' + b.tiers + '</td>' +
     '<td class="num hide-xs">' + costRange(b) + '</td>' +
     '<td class="facs">' + esc(facs) + '</td>' +
   '</tr>';
 }
 
+// faction-resolved name and picture for a level
+function lvlName(l) { return (state.fac && l.names[state.fac]) || l.name; }
+function lvlPic(l) { return (state.fac && l.pics[state.fac]) || l.pic; }
+function lvlVisible(l) { return !state.fac || !l.facs.length || l.facs.includes(state.fac); }
+
+function recruitLink(r) {
+  return (r.s ? '<a class="unitlink" href="index.html#' + r.s + '">' + esc(r.n) + '</a>' : esc(r.n)) +
+    (r.exp ? ' <span class="dim">+' + r.exp + ' exp</span>' : '');
+}
+
+function recruitsHtml(l) {
+  if (!l.recruits.length) return '';
+  if (state.fac) {
+    const list = l.recruits.filter(r => !r.f.length || r.f.includes(state.fac));
+    if (!list.length) return '';
+    return '<div class="rec"><b>Recruits</b>' + list.map(recruitLink).join(', ') + '</div>';
+  }
+  // no faction selected: group by faction so rosters don't blend
+  const groups = new Map();
+  for (const r of l.recruits) {
+    for (const k of (r.f.length ? r.f : ['Any owner'])) {
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    }
+  }
+  const order = [...groups.keys()].sort((a, b) =>
+    a === 'Any owner' ? -1 : b === 'Any owner' ? 1 : a.localeCompare(b));
+  if (order.length === 1) {
+    return '<div class="rec"><b>Recruits</b>' + groups.get(order[0]).map(recruitLink).join(', ') + '</div>';
+  }
+  return '<div class="rec"><b>Recruits</b>' + order.map(k =>
+    '<div class="rgrp"><span class="rfac">' + esc(k) + '</span>' + groups.get(k).map(recruitLink).join(', ') + '</div>').join('') + '</div>';
+}
+
 function levelHtml(l) {
-  const head = 'Tier ' + l.tier + '/' + l.of + ' — ' + esc(l.name) +
+  const head = 'Tier ' + l.tier + '/' + l.of + ' — ' + esc(lvlName(l)) +
     ' <span class="dim">' + [l.kind, l.cost ? l.cost + ' gold' : '', l.time ? l.time + (l.time === 1 ? ' turn' : ' turns') : '', l.min && l.min !== 'village' ? 'from ' + esc(l.min) : ''].filter(Boolean).join(' · ') + '</span>';
   const parts = ['<div class="tiername">' + head + '</div>'];
   if (l.effects.length) parts.push('<div class="fx"><b>Effects</b>' + l.effects.join(' · ') + '</div>');
-  if (l.recruits.length) {
-    parts.push('<div class="rec"><b>Recruits</b>' + l.recruits.map(r =>
-      (r.s ? '<a class="unitlink" href="index.html#' + r.s + '">' + esc(r.n) + '</a>' : esc(r.n)) +
-      (r.exp ? ' <span class="dim">+' + r.exp + ' exp</span>' : '')
-    ).join(', ') + '</div>');
-  }
+  const rec = recruitsHtml(l);
+  if (rec) parts.push(rec);
   const reqs = [];
   if (l.points !== null && l.points !== undefined) reqs.push(l.points + ' guild points');
   if (l.hr.length) reqs.push('region: ' + l.hr.join(', '));
   if (l.ev.length) reqs.push('event: ' + l.ev.join(', '));
   if (reqs.length) parts.push('<div class="req"><b>Requires</b>' + esc(reqs.join(' · ')) + '</div>');
-  const pic = l.pic ? '<img loading="lazy" alt="" src="' + l.pic + '">' : '';
+  const pic = lvlPic(l) ? '<img loading="lazy" alt="" src="' + lvlPic(l) + '">' : '';
   return '<div class="lvl">' + pic + '<div>' + parts.join('') + '</div></div>';
 }
 
@@ -2530,7 +2599,8 @@ function detailHtml(b) {
       (b.gfacs.length ? '<div class="dim">Offered to: ' + esc(b.gfacs.join(', ')) + '</div>' : '') +
       '<ul>' + b.how.map(h => '<li>' + esc(h) + '</li>').join('') + '</ul></div>';
   }
-  return '<tr class="detail"><td colspan="4">' + desc + guild + b.levels.map(levelHtml).join('') + '</td></tr>';
+  const ls = b.levels.filter(lvlVisible);
+  return '<tr class="detail"><td colspan="4">' + desc + guild + ls.map(levelHtml).join('') + '</td></tr>';
 }
 
 // ---- Tech-tree view: which tier unlocks at which settlement size ----
@@ -2554,10 +2624,10 @@ function renderTree(list) {
     html += '<tr class="cat-row"><td colspan="7">' + cat + '<span class="fcount">' + group.length + (group.length === 1 ? ' chain' : ' chains') + '</span></td></tr>';
     for (const { b, ls } of group) {
       shown += 1;
-      html += '<tr><td class="cname">' + esc(b.name) + '</td>' + SIZES.map(size => {
+      html += '<tr><td class="cname">' + esc(lvlName(ls[0])) + '</td>' + SIZES.map(size => {
         const here = ls.filter(l => (l.min || 'village') === size);
         return '<td>' + here.map(l =>
-          '<a class="goto" data-goto="' + b.slug + '" title="Open in list view">' + esc(l.name) + '</a>' +
+          '<a class="goto" data-goto="' + b.slug + '" title="Open in list view">' + esc(lvlName(l)) + '</a>' +
           (l.points !== null && l.points !== undefined ? ' <span class="dim">' + l.points + ' pts</span>' : '')
         ).join('<br>') + '</td>';
       }).join('') + '</tr>';

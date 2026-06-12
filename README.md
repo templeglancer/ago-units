@@ -95,6 +95,10 @@ needed beyond Node.
   "Buildings" rows link across the other way
 - Guild chains also explain how guild points are earned (from the eopData
   guild scripts) and which factions are offered each guild
+- Shared chains are faction-aware: recruit lists are grouped per faction, and
+  selecting a faction in the dropdown shows that faction's own building names,
+  pictures and recruits (e.g. Isengard's tier of the governance chain appears
+  as "Slave Pit" with Uruk recruits, not "Meeting Hall")
 - Tech-tree view on the buildings page: a settlement-size grid (Village →
   Huge City, city or castle, filterable by faction) showing which building
   tier unlocks at each size — a per-faction build planner
