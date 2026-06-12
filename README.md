@@ -104,6 +104,9 @@ needed beyond Node.
 - Chains restricted to one settlement type carry a small city/castle tag, so
   the paired city and castle versions of a same-named chain (two "Stables"
   rows) are distinguishable
+- Default building pictures (no faction selected) come from a single culture's
+  art series per chain, preferring the Gondor and elven sets; each faction's
+  own pictures still appear when it is selected in the dropdown
 - Tech-tree view on the buildings page: a settlement-size grid (Village →
   Huge City, city or castle, filterable by faction) showing which building
   tier unlocks at each size — a per-faction build planner; the castle toggle

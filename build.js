@@ -925,6 +925,13 @@ function effectsForFaction(effects, facTag, culture) {
 const chainSlug = (n) => n.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
 // Assembles the buildings-page model from the parsed EDB chains.
+// Default pictures (no faction selected) come from one culture's series per
+// chain, preferring the human and elven art sets; without this the pick falls
+// to whichever culture folder sorts first (eastern_european — the orc set),
+// and tiers of one chain can even mix series.
+const PIC_PREF = ['gondor', 'greek', 'northern_european', 'mesoamerican',
+  'southern_european', 'middle_eastern', 'eastern_european'];
+
 function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType, picIndex) {
   const triggers = parseGuildTriggers();
   const facNames = (facs) => [...new Set(facs.map((f) => ownerMap[f]).filter(Boolean))];
@@ -949,11 +956,30 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
     const culture = (owner && cultures[owner]) || '';
     const guild = guilds[chain.name];
     const allTags = Object.keys(ownerMap);
+    // one picture series for the whole chain: the owner's culture, else the
+    // preferred culture covering the most levels
+    let picCulture = culture;
+    if (!picCulture) {
+      const counts = new Map();
+      for (const l of chain.levels) {
+        for (const c of Object.keys(picIndex[l.level.toLowerCase()] || {})) {
+          counts.set(c, (counts.get(c) || 0) + 1);
+        }
+      }
+      let bestScore = -1;
+      for (let i = 0; i < PIC_PREF.length; i++) {
+        const n = counts.get(PIC_PREF[i]) || 0;
+        const score = n * 100 + (PIC_PREF.length - i);
+        if (n && score > bestScore) { bestScore = score; picCulture = PIC_PREF[i]; }
+      }
+    }
     const levels = chain.levels.map((l) => {
       const picByCulture = picIndex[l.level.toLowerCase()] || {};
-      const tga = picByCulture[culture] || Object.values(picByCulture)[0] || '';
+      const tgaCulture = picByCulture[picCulture] ? picCulture
+        : PIC_PREF.find((c) => picByCulture[c]) || Object.keys(picByCulture)[0] || '';
+      const tga = tgaCulture ? picByCulture[tgaCulture] : '';
       const defName = buildingDisplayName(bnames, l.level, culture, owner);
-      const defPic = tga ? exportImage(tga, l.level, OUT_BPICS, 'buildingpics') : '';
+      const defPic = tga ? exportImage(tga, `${l.level}_${tgaCulture}`, OUT_BPICS, 'buildingpics') : '';
       // Shared chains carry per-culture names and pictures (Isengard's version
       // of a chain isn't called what Gondor's is); store only the variants
       // that differ from the default, keyed by faction display name.
@@ -3176,6 +3202,25 @@ const model = buildModel();
 fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
 fs.writeFileSync(OUT_BHTML, buildBuildingsHtml(model), 'utf8');
 fs.writeFileSync(OUT_FHTML, buildFactionsHtml(model), 'utf8');
+
+// prune building pictures the model no longer references (default pics are
+// now culture-suffixed, orphaning the old unsuffixed exports)
+{
+  const used = new Set();
+  for (const b of model.buildings) {
+    for (const l of b.levels) {
+      if (l.pic) used.add(path.basename(l.pic));
+      for (const p of Object.values(l.pics)) used.add(path.basename(p));
+    }
+  }
+  if (fs.existsSync(OUT_BPICS)) {
+    let pruned = 0;
+    for (const f of fs.readdirSync(OUT_BPICS)) {
+      if (f.endsWith('.png') && !used.has(f)) { fs.unlinkSync(path.join(OUT_BPICS, f)); pruned += 1; }
+    }
+    if (pruned) console.log(`Pruned ${pruned} unreferenced building pictures.`);
+  }
+}
 console.log(`Factions page: ${model.factionPages.length} playable factions.`);
 console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections (${model.eopCount} added from eopData).`);
 console.log(`Buildings: ${model.buildings.length} chains (${model.buildings.filter((b) => b.cat === 'Guilds').length} guild chains).`);
