@@ -407,7 +407,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
 </header>
 
 <div class="controls">
@@ -475,6 +475,10 @@ UNITS.forEach((u, i) => { u.id = i; u.def = u.armour + u.skill + u.shield; });
 
 const state = { q: '', faction: '', cat: '', sortKey: null, sortDir: 1, open: new Set() };
 
+// ?faction=<name> pre-selects the faction filter (used by the factions page)
+const qpFaction = new URLSearchParams(location.search).get('faction');
+if (qpFaction && FACTIONS.includes(qpFaction)) state.faction = qpFaction;
+
 // Keep the sticky column header just below the (wrapping) control bar.
 const setCtrlH = () => document.documentElement.style.setProperty('--ctrlh',
   document.querySelector('.controls').offsetHeight + 'px');
@@ -489,6 +493,7 @@ for (const f of FACTIONS) {
   o.textContent = f + ' (' + n + ')';
   $faction.appendChild(o);
 }
+if (state.faction) $faction.value = state.faction;
 
 function unitCat(u) {
   if (u.category === 'ship' || u.shipType) return 'ship';

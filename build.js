@@ -19,6 +19,10 @@ const BUILDINGS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_buildings.txt'
 const SM_FACTIONS_TXT = path.join(MOD_ROOT, 'data', 'descr_sm_factions.txt');
 const MERC_TXT = path.join(MOD_ROOT, 'data', 'world', 'maps', 'campaign', 'imperial_campaign', 'descr_mercenaries.txt');
 const GUILDS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_guilds.txt');
+const CAMPAIGN_DESCR_TXT = path.join(MOD_ROOT, 'data', 'text', 'campaign_descriptions.txt');
+const FACTION_SYMBOL_DIR = path.join(MOD_ROOT, 'data', 'ui', 'faction_symbols');
+const OUT_FHTML = path.join(__dirname, 'factions.html');
+const OUT_FPICS = path.join(__dirname, 'factionpics');
 const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
 const OUT_HTML = path.join(__dirname, 'index.html');
@@ -530,6 +534,123 @@ function parseEdb(file) {
   return { byUnit, chains };
 }
 
+// eopData guild scripts: how guild points are earned. guildData.lua holds
+// modder-written "influenceActions" descriptions plus faction ownership via
+// F_* constants, which factionData.lua resolves to vanilla faction tags.
+function parseGuildTriggers() {
+  const facFile = path.join(EOP_SCRIPTS, 'Campaign', 'factionData.lua');
+  const guildFile = path.join(EOP_SCRIPTS, 'Campaign', 'Guilds', 'guildData.lua');
+  const byChain = {};
+  if (!fs.existsSync(facFile) || !fs.existsSync(guildFile)) return byChain;
+  const facLua = fs.readFileSync(facFile, 'utf8');
+  // f_highelves -> "saxons"
+  const keyToTag = {};
+  for (const m of facLua.matchAll(/(f_\w+)\s*=\s*factionData:new\s*\{[\s\S]*?name\s*=\s*"(\w+)"/g)) {
+    keyToTag[m[1]] = m[2];
+  }
+  // F_HIGHELVES -> f_highelves
+  const constToKey = {};
+  for (const m of facLua.matchAll(/(F_\w+)\s*=\s*FACTION\.data\.(f_\w+)/g)) {
+    constToKey[m[1]] = m[2];
+  }
+  const lua = fs.readFileSync(guildFile, 'utf8');
+  const starts = [...lua.matchAll(/\w+\s*=\s*guildData:new\s*\{/g)];
+  for (let i = 0; i < starts.length; i++) {
+    const seg = lua.slice(starts[i].index, i + 1 < starts.length ? starts[i + 1].index : undefined);
+    const chain = (seg.match(/buildingName\s*=\s*"([^"]+)"/) || [])[1];
+    if (!chain) continue;
+    const how = [...((seg.match(/influenceActions\s*=\s*\{([\s\S]*?)\}/) || [])[1] || '').matchAll(/"([^"]*)"/g)]
+      .map((m) => m[1].replace(/^\s*-\s*/, '').trim()).filter(Boolean);
+    const facTags = [...((seg.match(/factionOwnership\s*=\s*\{([\s\S]*?)\}/) || [])[1] || '').matchAll(/(F_\w+)\.name/g)]
+      .map((m) => keyToTag[constToKey[m[1]]]).filter(Boolean);
+    byChain[chain] = {
+      gname: (seg.match(/displayName\s*=\s*"([^"]+)"/) || [])[1] || '',
+      how,
+      facTags,
+    };
+  }
+  return byChain;
+}
+
+// eopData factionData.lua: per-faction side (good/evil), curated unit tiers
+// and historic capitals, keyed by the vanilla faction tag.
+function parseFactionLua() {
+  const file = path.join(EOP_SCRIPTS, 'Campaign', 'factionData.lua');
+  const out = {};
+  if (!fs.existsSync(file)) return out;
+  const lua = fs.readFileSync(file, 'utf8');
+  const starts = [...lua.matchAll(/f_\w+\s*=\s*factionData:new\s*\{/g)];
+  for (let i = 0; i < starts.length; i++) {
+    const seg = lua.slice(starts[i].index, i + 1 < starts.length ? starts[i + 1].index : undefined);
+    const tag = (seg.match(/name\s*=\s*"(\w+)"/) || [])[1];
+    if (!tag) continue;
+    const list = (key) => [...((seg.match(new RegExp(key + '\\s*=\\s*\\{([^}]*)\\}')) || [])[1] || '')
+      .matchAll(/"([^"]+)"/g)].map((m) => m[1]).filter((n) => !/\.\w{3}$/.test(n)); // skip stray asset filenames
+    out[tag] = {
+      side: /side\s*=\s*factionSides\.good/.test(seg) ? 'good'
+        : /side\s*=\s*factionSides\.(sauron|saruman|evil)/.test(seg) ? 'evil'
+        : /side\s*=\s*factionSides\.neutral/.test(seg) ? 'neutral' : '',
+      low: list('lowTierUnits'), mid: list('midTierUnits'), high: list('highTierUnits'),
+      capitals: list('historicCapitals'),
+    };
+  }
+  return out;
+}
+
+// Faction overview model: campaign_descriptions.txt blurbs + factionData.lua
+// tiers + roster counts from the unit model.
+function buildFactionsModel(units, ownerMap, unitsByType) {
+  const cdesc = parseExportUnits(CAMPAIGN_DESCR_TXT);
+  const facLua = parseFactionLua();
+  const sectionOrder = [...new Set(units.map((u) => u.faction))];
+  const byName = {};
+  for (const u of units) if (!byName[u.name.toLowerCase()]) byName[u.name.toLowerCase()] = u;
+  // Lua lists mix EDU type names ("Dunedain Rangers") and display names
+  // ("Dúnedain Rangers"), sometimes with a parenthetical note appended.
+  const linkify = (names) => names.map((n) => {
+    const bare = n.replace(/\s*\(.*\)$/, '').trim().toLowerCase();
+    const u = byName[n.toLowerCase()] || byName[bare] || unitsByType[n.toLowerCase()] || unitsByType[bare];
+    return { n: u && u.name ? u.name : n, s: u ? u.slug : '' };
+  });
+  const out = [];
+  for (const key of Object.keys(cdesc)) {
+    const m = key.match(/^imperial_campaign_(\w+)_descr$/);
+    if (!m) continue;
+    const tag = m[1];
+    const section = ownerMap[tag];
+    if (!section) continue;
+    const title = (cdesc[`imperial_campaign_${tag}_title`] || section).trim();
+    const descr = cleanText(cdesc[key]);
+    const roster = units.filter((u) => u.faction === section);
+    if (!roster.length) continue;
+    const lua = facLua[tag] || { side: '', low: [], mid: [], high: [], capitals: [] };
+    const counts = { total: roster.length, infantry: 0, cavalry: 0, ranged: 0, siege: 0, ships: 0 };
+    for (const u of roster) {
+      if (u.category === 'ship' || u.shipType) counts.ships += 1;
+      else if (u.category === 'siege') counts.siege += 1;
+      else if (u.msl !== null && u.category === 'infantry') counts.ranged += 1;
+      else if (u.category === 'cavalry') counts.cavalry += 1;
+      else counts.infantry += 1;
+    }
+    const symTga = path.join(FACTION_SYMBOL_DIR, tag + '.tga');
+    out.push({
+      slug: chainSlug(title),
+      section,
+      name: title,
+      side: lua.side,
+      sym: fs.existsSync(symTga) ? exportImage(symTga, tag, OUT_FPICS, 'factionpics') : '',
+      leader: ((descr.match(/Leader:\s*([^\n]+)/) || [])[1] || '').trim(),
+      heir: ((descr.match(/Heir:\s*([^\n]+)/) || [])[1] || '').trim(),
+      capital: ((descr.match(/Capital:\s*([^\n]+)/) || [])[1] || '').trim(),
+      counts,
+      low: linkify(lua.low), mid: linkify(lua.mid), high: linkify(lua.high),
+      descr,
+    });
+  }
+  out.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section));
+  return out;
+}
+
 // export_descr_guilds.txt: guild -> its building chain and the guild-point
 // thresholds at which each level is offered.
 function parseGuilds(file) {
@@ -725,6 +846,7 @@ const chainSlug = (n) => n.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').repl
 
 // Assembles the buildings-page model from the parsed EDB chains.
 function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType, picIndex) {
+  const triggers = parseGuildTriggers();
   const facNames = (facs) => [...new Set(facs.map((f) => ownerMap[f]).filter(Boolean))];
   // hidden resources used by at most 2 chains are unique-landmark locks
   const hrChains = new Map();
@@ -784,6 +906,9 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
       facs: [...new Set(levels.flatMap((l) => l.facs))],
       desc: cleanText(buildingDesc(bnames, chain.levels[0].level, culture, owner)),
       guild: guild ? guild.name.replace(/_/g, ' ') : '',
+      gname: (triggers[chain.name] || {}).gname || '',
+      how: (triggers[chain.name] || {}).how || [],
+      gfacs: facNames((triggers[chain.name] || {}).facTags || []),
       pic: first.pic,
       levels,
     });
@@ -1071,8 +1196,10 @@ function buildModel() {
     for (const r of u.recruit) if (!published.has(r.c)) r.c = '';
   }
 
+  const factionPages = buildFactionsModel(units, ownerMap, unitsByType);
+
   return {
-    units, factions, projectiles, mounts, buildings,
+    units, factions, projectiles, mounts, buildings, factionPages,
     missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
@@ -1495,7 +1622,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
 </header>
 
 <div class="controls">
@@ -1563,6 +1690,10 @@ UNITS.forEach((u, i) => { u.id = i; u.def = u.armour + u.skill + u.shield; });
 
 const state = { q: '', faction: '', cat: '', sortKey: null, sortDir: 1, open: new Set() };
 
+// ?faction=<name> pre-selects the faction filter (used by the factions page)
+const qpFaction = new URLSearchParams(location.search).get('faction');
+if (qpFaction && FACTIONS.includes(qpFaction)) state.faction = qpFaction;
+
 // Keep the sticky column header just below the (wrapping) control bar.
 const setCtrlH = () => document.documentElement.style.setProperty('--ctrlh',
   document.querySelector('.controls').offsetHeight + 'px');
@@ -1577,6 +1708,7 @@ for (const f of FACTIONS) {
   o.textContent = f + ' (' + n + ')';
   $faction.appendChild(o);
 }
+if (state.faction) $faction.value = state.faction;
 
 function unitCat(u) {
   if (u.category === 'ship' || u.shipType) return 'ship';
@@ -2125,6 +2257,15 @@ header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-
   padding: 4px 8px;
   width: 230px;
 }
+.controls select {
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--ink);
+  background: #fbf6e7;
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 4px 8px;
+}
 .catbtns { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--line-dark); border-radius: 3px; overflow: hidden; }
 .catbtns button {
   font-family: var(--display);
@@ -2216,10 +2357,29 @@ tr.detail td {
   margin-right: 6px;
 }
 .cond { border-bottom: 1px dotted var(--line-dark); cursor: help; }
+.ghow { margin: 4px 0 10px; padding: 8px 12px; background: rgba(138,109,47,.07); border: 1px solid var(--line); border-radius: 3px; max-width: 80ch; }
+.ghow > b {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.ghow ul { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
+.ghow li { margin: 2px 0; }
 a.unitlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
 a.unitlink:hover { background: rgba(122,31,31,.08); }
 tr.bld.flash { animation: rowflash 1.6s ease-out; }
 @keyframes rowflash { 0% { background: #d8b86a; } 100% { background: var(--row-alt); } }
+#tree { overflow-x: auto; }
+#tree table { width: 100%; border-collapse: collapse; min-width: 760px; }
+#tree td { padding: 4px 8px; border: 1px solid var(--line); font-size: 13.5px; vertical-align: top; background: var(--parchment); }
+#tree tr:nth-child(even) td { background: var(--row-alt); }
+#tree td.cname { font-weight: 600; font-size: 14px; }
+#tree a.goto { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); cursor: pointer; display: inline-block; margin: 1px 0; }
+#tree a.goto:hover { background: rgba(122,31,31,.08); }
+#tree .note { font-style: italic; color: var(--ink-soft); font-size: 13px; margin: 8px 0; }
 .empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 30px; font-size: 17px; }
 footer {
   text-align: center;
@@ -2245,11 +2405,12 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a></nav>
 </header>
 
 <div class="controls">
   <input type="search" id="q" placeholder="Search buildings&hellip;" autocomplete="off">
+  <select id="fac"><option value="">All factions</option></select>
   <span class="catbtns" id="cats">
     <button data-cat="" class="active">All</button>
     <button data-cat="Military">Military</button>
@@ -2260,11 +2421,19 @@ footer {
     <button data-cat="Guilds">Guilds</button>
     <button data-cat="Other">Other</button>
   </span>
+  <span class="catbtns" id="views">
+    <button data-view="list" class="active">List</button>
+    <button data-view="tree">Tech tree</button>
+  </span>
+  <span class="catbtns" id="kinds" hidden>
+    <button data-kind="city" class="active">City</button>
+    <button data-kind="castle">Castle</button>
+  </span>
   <span class="count" id="count"></span>
 </div>
 
 <main>
-  <table>
+  <table id="listtbl">
     <thead>
       <tr>
         <th>Building</th>
@@ -2275,6 +2444,7 @@ footer {
     </thead>
     <tbody id="rows"></tbody>
   </table>
+  <div id="tree" hidden></div>
   <div class="empty" id="empty" hidden>No buildings match these filters.</div>
 </main>
 
@@ -2284,7 +2454,15 @@ footer {
 const BLD = ${bldJson};
 BLD.forEach((b, i) => { b.id = i; });
 const CATS = ['Military', 'Defence', 'Economy', 'Civic', 'Regional', 'Guilds', 'Other'];
-const state = { q: '', cat: '', open: new Set() };
+const state = { q: '', cat: '', fac: '', view: 'list', kind: 'city', open: new Set() };
+
+const $fac = document.getElementById('fac');
+for (const f of [...new Set(BLD.flatMap(b => b.facs))].sort()) {
+  const o = document.createElement('option');
+  o.value = f;
+  o.textContent = f;
+  $fac.appendChild(o);
+}
 
 const setCtrlH = () => document.documentElement.style.setProperty('--ctrlh',
   document.querySelector('.controls').offsetHeight + 'px');
@@ -2297,6 +2475,7 @@ function esc(s) {
 
 function matches(b) {
   if (state.cat && b.cat !== state.cat) return false;
+  if (state.fac && b.facs.length && !b.facs.includes(state.fac)) return false;
   if (state.q) {
     const q = state.q.toLowerCase();
     const hay = (b.name + ' ' + b.levels.map(l => l.name).join(' ') + ' ' + b.facs.join(' ') + ' ' + b.guild).toLowerCase();
@@ -2345,33 +2524,112 @@ function levelHtml(l) {
 
 function detailHtml(b) {
   const desc = b.desc ? '<p class="bdesc">' + esc(b.desc) + '</p>' : '';
-  return '<tr class="detail"><td colspan="4">' + desc + b.levels.map(levelHtml).join('') + '</td></tr>';
+  let guild = '';
+  if (b.how.length || b.gfacs.length) {
+    guild = '<div class="ghow"><b>Earning guild points</b>' +
+      (b.gfacs.length ? '<div class="dim">Offered to: ' + esc(b.gfacs.join(', ')) + '</div>' : '') +
+      '<ul>' + b.how.map(h => '<li>' + esc(h) + '</li>').join('') + '</ul></div>';
+  }
+  return '<tr class="detail"><td colspan="4">' + desc + guild + b.levels.map(levelHtml).join('') + '</td></tr>';
+}
+
+// ---- Tech-tree view: which tier unlocks at which settlement size ----
+const SIZES = ['village', 'town', 'large town', 'city', 'large city', 'huge city'];
+const SIZE_LABELS = ['Village', 'Town', 'Large Town', 'City', 'Large City', 'Huge City'];
+const CASTLE_NOTE = 'Castle equivalents: Town = Motte &amp; Bailey, Large Town = Wooden Castle, City = Castle, Large City = Fortress, Huge City = Citadel.';
+
+function treeLevels(b) {
+  return b.levels.filter(l =>
+    (l.kind === '' || l.kind === state.kind) &&
+    (!state.fac || !l.facs.length || l.facs.includes(state.fac)));
+}
+
+function renderTree(list) {
+  let html = state.kind === 'castle' ? '<p class="note">' + CASTLE_NOTE + '</p>' : '';
+  html += '<table><thead><tr><th>Building</th>' + SIZE_LABELS.map(s => '<th>' + s + '</th>').join('') + '</tr></thead><tbody>';
+  let shown = 0;
+  for (const cat of CATS) {
+    const group = list.filter(b => b.cat === cat).map(b => ({ b, ls: treeLevels(b) })).filter(x => x.ls.length);
+    if (!group.length) continue;
+    html += '<tr class="cat-row"><td colspan="7">' + cat + '<span class="fcount">' + group.length + (group.length === 1 ? ' chain' : ' chains') + '</span></td></tr>';
+    for (const { b, ls } of group) {
+      shown += 1;
+      html += '<tr><td class="cname">' + esc(b.name) + '</td>' + SIZES.map(size => {
+        const here = ls.filter(l => (l.min || 'village') === size);
+        return '<td>' + here.map(l =>
+          '<a class="goto" data-goto="' + b.slug + '" title="Open in list view">' + esc(l.name) + '</a>' +
+          (l.points !== null && l.points !== undefined ? ' <span class="dim">' + l.points + ' pts</span>' : '')
+        ).join('<br>') + '</td>';
+      }).join('') + '</tr>';
+    }
+  }
+  html += '</tbody></table>';
+  document.getElementById('tree').innerHTML = html;
+  return shown;
 }
 
 function render() {
   const list = BLD.filter(matches);
-  let html = '';
-  for (const cat of CATS) {
-    const group = list.filter(b => b.cat === cat);
-    if (!group.length) continue;
-    html += '<tr class="cat-row"><td colspan="4">' + cat + '<span class="fcount">' + group.length + (group.length === 1 ? ' chain' : ' chains') + '</span></td></tr>';
-    for (const b of group) {
-      html += rowHtml(b);
-      if (state.open.has(b.id)) html += detailHtml(b);
+  const isTree = state.view === 'tree';
+  document.getElementById('listtbl').hidden = isTree;
+  document.getElementById('tree').hidden = !isTree;
+  document.getElementById('kinds').hidden = !isTree;
+  let shown = list.length;
+  if (isTree) {
+    shown = renderTree(list);
+    document.getElementById('rows').innerHTML = '';
+  } else {
+    let html = '';
+    for (const cat of CATS) {
+      const group = list.filter(b => b.cat === cat);
+      if (!group.length) continue;
+      html += '<tr class="cat-row"><td colspan="4">' + cat + '<span class="fcount">' + group.length + (group.length === 1 ? ' chain' : ' chains') + '</span></td></tr>';
+      for (const b of group) {
+        html += rowHtml(b);
+        if (state.open.has(b.id)) html += detailHtml(b);
+      }
     }
+    document.getElementById('rows').innerHTML = html;
+    document.getElementById('tree').innerHTML = '';
   }
-  document.getElementById('rows').innerHTML = html;
-  document.getElementById('empty').hidden = list.length > 0;
-  document.getElementById('count').textContent = list.length + ' of ' + BLD.length + ' chains';
+  document.getElementById('empty').hidden = shown > 0;
+  document.getElementById('count').textContent = shown + ' of ' + BLD.length + ' chains';
 }
 
 document.getElementById('q').addEventListener('input', (e) => { state.q = e.target.value.trim(); render(); });
+$fac.addEventListener('change', (e) => { state.fac = e.target.value; render(); });
 document.getElementById('cats').addEventListener('click', (e) => {
   const btn = e.target.closest('button');
   if (!btn) return;
   state.cat = btn.dataset.cat;
-  for (const x of document.querySelectorAll('.catbtns button')) x.classList.toggle('active', x === btn);
+  for (const x of document.querySelectorAll('#cats button')) x.classList.toggle('active', x === btn);
   render();
+});
+document.getElementById('views').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  state.view = btn.dataset.view;
+  for (const x of document.querySelectorAll('#views button')) x.classList.toggle('active', x === btn);
+  render();
+});
+document.getElementById('kinds').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  state.kind = btn.dataset.kind;
+  for (const x of document.querySelectorAll('#kinds button')) x.classList.toggle('active', x === btn);
+  render();
+});
+// tree cell -> open the chain in list view
+document.getElementById('tree').addEventListener('click', (e) => {
+  const a = e.target.closest('a[data-goto]');
+  if (!a) return;
+  state.view = 'list';
+  for (const x of document.querySelectorAll('#views button')) x.classList.toggle('active', x.dataset.view === 'list');
+  const b = BLD.find(x => x.slug === a.dataset.goto);
+  if (b) { state.open.add(b.id); setHash(b.slug); }
+  render();
+  const row = b && document.querySelector('tr.bld[data-id="' + b.id + '"]');
+  if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
 });
 
 function setHash(slug) {
@@ -2439,11 +2697,294 @@ if (location.hash) {
 `;
 }
 
+// ------------------------------------------------------------ factions page
+
+function buildFactionsHtml(model) {
+  const facJson = JSON.stringify(model.factionPages);
+  const generated = new Date().toISOString().slice(0, 10);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Factions</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --good: #2f5d31;
+  --bad: #8a2525;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.35;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+main { max-width: 1100px; margin: 0 auto; padding: 12px 14px 60px; }
+h2.side {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-align: center;
+  margin: 26px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-dark);
+  border-top: 2px solid var(--line-dark);
+  background: linear-gradient(90deg, var(--parchment-dark), #f0e7cf 40%, var(--parchment-dark));
+}
+h2.side.good { color: var(--good); }
+h2.side.evil { color: var(--bad); }
+.fcard {
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  background: var(--parchment);
+  margin: 0 0 10px;
+  cursor: pointer;
+}
+.fcard:hover { background: #efe6cd; }
+.fcard.open { background: #f7f0dd; cursor: default; }
+.fhead { display: flex; align-items: center; gap: 14px; padding: 8px 14px; }
+.fhead img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+.fhead .fname { font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: .06em; }
+.fhead .fmeta { color: var(--ink-soft); font-size: 13.5px; margin-top: 1px; }
+.fhead .fnum {
+  margin-left: auto;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.fbody { display: none; padding: 0 16px 14px; border-top: 1px dotted var(--line); }
+.fcard.open .fbody { display: block; }
+.fbody .cols { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 10px; }
+.fbody .col { flex: 1 1 300px; min-width: 260px; }
+.fbody h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 12px 0 4px;
+}
+.fbody p { margin: 0 0 8px; max-width: 80ch; text-align: justify; hyphens: auto; }
+.fbody .quote { font-style: italic; color: var(--ink-soft); }
+.fbody a.unitlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); cursor: pointer; }
+.fbody a.unitlink:hover { background: rgba(122,31,31,.08); }
+.fbody .roster {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: .04em;
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  background: var(--accent);
+  color: #f6eeda;
+  padding: 4px 12px;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 10px;
+}
+.dim { color: var(--ink-soft); font-size: 12.5px; }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  .fhead .fnum { display: none; }
+  main { padding: 8px 6px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Factions</h1>
+  <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
+</header>
+
+<main id="main"></main>
+
+<footer>Generated ${generated} from <code>campaign_descriptions.txt</code> &amp; <code>factionData.lua</code> &middot; ${model.factionPages.length} playable factions &middot; click a faction for its full campaign overview</footer>
+
+<script>
+const FAC = ${facJson};
+FAC.forEach((f, i) => { f.id = i; });
+const open = new Set();
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function tierLine(list) {
+  return list.map(u => u.s
+    ? '<a class="unitlink" href="index.html#' + u.s + '">' + esc(u.n) + '</a>'
+    : esc(u.n)).join(', ');
+}
+
+// The campaign blurb: bold the section headers, italicise the lore quote.
+function descrHtml(f) {
+  const paras = f.descr.split(/\\n+/).map(p => p.trim()).filter(Boolean)
+    .filter(p => !/^(Leader|Heir|Capital):/.test(p));
+  return paras.map(p => {
+    const hm = p.match(/^([A-Z][\\w'\\u2019 -]{2,30}):\\s*([\\s\\S]*)$/);
+    if (hm) return '<h3>' + esc(hm[1]) + '</h3>' + (hm[2] ? '<p>' + esc(hm[2]) + '</p>' : '');
+    if (/^[\\u201c"]/.test(p)) return '<p class="quote">' + esc(p) + '</p>';
+    if (/^-\\s/.test(p)) return '<p>' + esc(p) + '</p>';
+    return '<p>' + esc(p) + '</p>';
+  }).join('');
+}
+
+function cardHtml(f) {
+  const c = f.counts;
+  const breakdown = [
+    c.infantry && c.infantry + ' infantry', c.ranged && c.ranged + ' ranged',
+    c.cavalry && c.cavalry + ' cavalry', c.siege && c.siege + ' siege', c.ships && c.ships + ' ships',
+  ].filter(Boolean).join(' · ');
+  const meta = [f.leader && 'Leader: ' + f.leader, f.capital && 'Capital: ' + f.capital].filter(Boolean).join(' · ');
+  let body = '';
+  if (open.has(f.id)) {
+    body = '<div class="fbody">' +
+      '<div class="cols"><div class="col">' + descrHtml(f) + '</div>' +
+      '<div class="col">' +
+      (f.heir ? '<h3>Heir</h3><p>' + esc(f.heir) + '</p>' : '') +
+      '<h3>Roster (' + c.total + ' units)</h3><p>' + breakdown + '</p>' +
+      (f.low.length ? '<h3>Early units</h3><p>' + tierLine(f.low) + '</p>' : '') +
+      (f.mid.length ? '<h3>Mid-tier units</h3><p>' + tierLine(f.mid) + '</p>' : '') +
+      (f.high.length ? '<h3>Elite units</h3><p>' + tierLine(f.high) + '</p>' : '') +
+      '<a class="roster" href="index.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
+      '</div></div></div>';
+  }
+  return '<div class="fcard' + (open.has(f.id) ? ' open' : '') + '" data-id="' + f.id + '">' +
+    '<div class="fhead">' +
+    (f.sym ? '<img loading="lazy" alt="" src="' + f.sym + '">' : '') +
+    '<div><div class="fname">' + esc(f.name) + '</div>' +
+    (meta ? '<div class="fmeta">' + esc(meta) + '</div>' : '') + '</div>' +
+    '<div class="fnum">' + c.total + ' units</div>' +
+    '</div>' + body + '</div>';
+}
+
+function render() {
+  let html = '';
+  const SIDE_TITLES = { good: 'The Free Peoples', evil: 'The Shadow', neutral: 'Neutral Powers', '': 'Others' };
+  for (const side of ['good', 'neutral', 'evil', '']) {
+    const group = FAC.filter(f => f.side === side);
+    if (!group.length) continue;
+    html += '<h2 class="side ' + side + '">' + SIDE_TITLES[side] + '</h2>';
+    html += group.map(cardHtml).join('');
+  }
+  document.getElementById('main').innerHTML = html;
+}
+
+document.getElementById('main').addEventListener('click', (e) => {
+  if (e.target.closest('a')) return;
+  const card = e.target.closest('.fcard');
+  if (!card) return;
+  const id = Number(card.dataset.id);
+  // clicking the header of an open card closes it
+  if (open.has(id)) {
+    if (!e.target.closest('.fbody')) {
+      open.delete(id);
+      if (location.hash === '#' + FAC[id].slug) history.replaceState(null, '', location.pathname);
+    }
+  } else {
+    open.add(id);
+    history.replaceState(null, '', '#' + FAC[id].slug);
+  }
+  render();
+});
+
+document.getElementById('main').addEventListener('error', (e) => {
+  if (e.target instanceof HTMLImageElement) e.target.remove();
+}, true);
+
+function openFromHash() {
+  const slug = decodeURIComponent(location.hash.replace(/^#/, ''));
+  const f = FAC.find(x => x.slug === slug);
+  if (!f || open.has(f.id)) return;
+  open.add(f.id);
+  render();
+  document.querySelector('.fcard[data-id="' + f.id + '"]')?.scrollIntoView({ block: 'start', behavior: 'instant' });
+}
+window.addEventListener('hashchange', openFromHash);
+
+if (location.hash && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+render();
+openFromHash();
+if (location.hash) {
+  let active = true;
+  const stop = () => { active = false; };
+  for (const evName of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+    window.addEventListener(evName, stop, { once: true, passive: true });
+  }
+  const keep = () => {
+    const card = document.querySelector('.fcard.open');
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    if (r.top < 0 || r.top > innerHeight * 0.5) card.scrollIntoView({ block: 'start', behavior: 'instant' });
+  };
+  const tick = setInterval(() => { if (active) keep(); }, 250);
+  setTimeout(() => clearInterval(tick), 3000);
+}
+</script>
+</body>
+</html>
+`;
+}
+
 // ---------------------------------------------------------------------- run
 
 const model = buildModel();
 fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
 fs.writeFileSync(OUT_BHTML, buildBuildingsHtml(model), 'utf8');
+fs.writeFileSync(OUT_FHTML, buildFactionsHtml(model), 'utf8');
+console.log(`Factions page: ${model.factionPages.length} playable factions.`);
 console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections (${model.eopCount} added from eopData).`);
 console.log(`Buildings: ${model.buildings.length} chains (${model.buildings.filter((b) => b.cat === 'Guilds').length} guild chains).`);
 console.log(`${model.recruitable} units have building recruitment data; ${model.mercCount} have mercenary pools.`);

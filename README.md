@@ -3,8 +3,10 @@
 Live at **https://agocompendium.com** (GitHub Pages behind Cloudflare).
 
 A self-contained website displaying every unit in the AGO mod, with names,
-descriptions, and battle stats merged from the mod's data files. A companion
-page, **buildings.html**, catalogues every building chain and guild.
+descriptions, and battle stats merged from the mod's data files. Companion
+pages: **buildings.html** (every building chain and guild, with a settlement
+tech-tree view) and **factions.html** (campaign overviews for all 26 playable
+factions).
 
 ## Viewing
 
@@ -91,3 +93,13 @@ needed beyond Node.
   (walls, law, growth, trade, upgrade tiers…), recruited units linking back to
   the unit page, and guild-point thresholds for the 15 guild chains; unit-page
   "Buildings" rows link across the other way
+- Guild chains also explain how guild points are earned (from the eopData
+  guild scripts) and which factions are offered each guild
+- Tech-tree view on the buildings page: a settlement-size grid (Village →
+  Huge City, city or castle, filterable by faction) showing which building
+  tier unlocks at each size — a per-faction build planner
+- Factions page (`factions.html`): all 26 playable factions grouped into Free
+  Peoples / Neutral / Shadow, each with its symbol, leader and capital, the
+  full campaign-selection overview, roster breakdown, and early/mid/elite
+  unit tiers (from `factionData.lua`) linking to the unit page; "View full
+  roster" opens the unit page pre-filtered (`index.html?faction=...`)
