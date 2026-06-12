@@ -18,11 +18,14 @@ const EDB_TXT = path.join(MOD_ROOT, 'data', 'export_descr_buildings.txt');
 const BUILDINGS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_buildings.txt');
 const SM_FACTIONS_TXT = path.join(MOD_ROOT, 'data', 'descr_sm_factions.txt');
 const MERC_TXT = path.join(MOD_ROOT, 'data', 'world', 'maps', 'campaign', 'imperial_campaign', 'descr_mercenaries.txt');
+const GUILDS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_guilds.txt');
 const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
 const OUT_HTML = path.join(__dirname, 'index.html');
+const OUT_BHTML = path.join(__dirname, 'buildings.html');
 const OUT_PORTRAITS = path.join(__dirname, 'portraits');
 const OUT_CARDS = path.join(__dirname, 'cards');
+const OUT_BPICS = path.join(__dirname, 'buildingpics');
 
 // ------------------------------------------------------------- TGA -> PNG
 
@@ -412,51 +415,135 @@ function parseMounts(file) {
 
 // ------------------------------------------------------------- recruitment
 
-// export_descr_buildings.txt: which building level trains which unit, with
-// pool size, replenish rate (units per turn) and experience bonus.
+// Curated building effects (key -> display label). Anything not listed is a
+// structural or remap-artifact line we deliberately skip.
+const EFFECT_LABELS = {
+  wall_level: 'Walls', tower_level: 'Towers',
+  gate_strength: 'Gate strength', gate_defences: 'Gate defences',
+  law_bonus: 'Law', happiness_bonus: 'Happiness',
+  population_growth_bonus: 'Growth', population_health_bonus: 'Health',
+  population_loyalty_bonus: 'Loyalty',
+  trade_base_income_bonus: 'Trade', taxable_income_bonus: 'Tax',
+  income_bonus: 'Income', mine_resource: 'Mining',
+  farming_level: 'Farming', road_level: 'Roads',
+  free_upkeep: 'Free upkeep', recruits_morale_bonus: 'Recruit morale',
+  recruits_exp_bonus: 'Recruit exp', recruitment_slots: 'Recruit slots',
+  retrain_cost_bonus: 'Retrain cost',
+  armour: 'Armour upgrades',
+  weapon_melee_simple: 'Weapon upgrades (simple)',
+  weapon_melee_blade: 'Weapon upgrades (bladed)',
+  weapon_missile_mechanical: 'Weapon upgrades (missile)',
+  weapon_missile_gunpowder: 'Weapon upgrades (engines)',
+  weapon_artillery_mechanical: 'Weapon upgrades (artillery)',
+  religion_level: 'Influence', amplify_religion_level: 'Influence spread',
+  construction_cost_bonus_wooden: 'Wooden build cost',
+  construction_cost_bonus_stone: 'Stone build cost',
+  construction_time_bonus_military: 'Military build time',
+  construction_time_bonus_religious: 'Religious build time',
+  construction_time_bonus_defensive: 'Defensive build time',
+  construction_time_bonus_other: 'Civil build time',
+  stage_games: 'Stages games', stage_races: 'Stages races',
+  archer_bonus: 'Archer exp', cavalry_bonus: 'Cavalry exp',
+  heavy_cavalry_bonus: 'Heavy cavalry exp',
+  trade_fleet: 'Trade fleet', recruitment_cost_bonus_naval: 'Ship cost',
+  fire_risk: 'Fire risk',
+};
+// keys whose value is a tier ("level 2"), a percent discount, or a plain flag
+const LEVEL_KEYS = new Set(['wall_level', 'tower_level', 'farming_level', 'road_level',
+  'armour', 'weapon_melee_simple', 'weapon_melee_blade', 'weapon_missile_mechanical',
+  'weapon_missile_gunpowder', 'weapon_artillery_mechanical', 'mine_resource']);
+const PCT_KEYS = new Set(['construction_cost_bonus_wooden', 'construction_cost_bonus_stone',
+  'construction_time_bonus_military', 'construction_time_bonus_religious',
+  'construction_time_bonus_defensive', 'construction_time_bonus_other',
+  'recruitment_cost_bonus_naval', 'retrain_cost_bonus']);
+const FLAG_KEYS = new Set(['stage_games', 'stage_races']);
+
+// export_descr_buildings.txt: every building chain with its levels, tiers,
+// construction cost/time, curated effects and recruit pools. Returns both the
+// full chain model (buildings page) and a per-unit pool index (unit page).
 function parseEdb(file) {
-  const entries = {};
-  if (!fs.existsSync(file)) return entries;
+  const byUnit = {};
+  const chains = [];
+  if (!fs.existsSync(file)) return { byUnit, chains };
   let chain = null;
   let levels = [];
-  let curLevel = null;
-  let kind = '';
+  let cur = null;
+  const condInfo = (conds) => {
+    const facs = ((conds.match(/factions\s*\{([^}]*)\}/) || [])[1] || '')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+    const hr = [...conds.matchAll(/(not\s+)?hidden_resource\s+(\S+)/g)]
+      .filter((x) => !x[1]).map((x) => x[2]);
+    const evAll = [...conds.matchAll(/(not\s+)?event_counter\s+(\S+)/g)];
+    const aiOnly = evAll.some((x) => !x[1] && x[2] === 'is_the_ai');
+    const ev = evAll.filter((x) => !x[1] && x[2] !== 'is_the_ai').map((x) => x[2]);
+    return { facs, hr, ev, aiOnly };
+  };
   for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
     const t = raw.split(';')[0].trim();
     if (!t) continue;
     let m;
-    if ((m = t.match(/^building\s+(\S+)/))) { chain = m[1]; levels = []; curLevel = null; continue; }
-    if (chain && (m = t.match(/^levels\s+(.+)$/))) { levels = m[1].trim().split(/\s+/); continue; }
-    const first = t.split(/\s+/)[0];
-    if (levels.includes(first) && /\brequires\b/.test(t)) {
-      curLevel = first;
-      const second = t.split(/\s+/)[1];
-      kind = second === 'castle' ? 'castle' : second === 'city' ? 'city' : '';
+    if ((m = t.match(/^building\s+(\S+)/))) {
+      chain = { name: m[1], levels: [] };
+      chains.push(chain);
+      levels = [];
+      cur = null;
       continue;
     }
-    if (curLevel && (m = t.match(/^recruit_pool\s+"([^"]+)"\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+requires\s+(.*)$/))) {
-      const unit = m[1].toLowerCase();
-      const conds = m[6];
-      const facs = ((conds.match(/factions\s*\{([^}]*)\}/) || [])[1] || '')
-        .split(',').map((s) => s.trim()).filter(Boolean);
-      const hr = [...conds.matchAll(/(not\s+)?hidden_resource\s+(\S+)/g)]
-        .filter((x) => !x[1]).map((x) => x[2]);
-      const evAll = [...conds.matchAll(/(not\s+)?event_counter\s+(\S+)/g)];
-      if (evAll.some((x) => !x[1] && x[2] === 'is_the_ai')) continue; // AI-only pool
-      const ev = evAll.filter((x) => !x[1] && x[2] !== 'is_the_ai').map((x) => x[2]);
-      (entries[unit] = entries[unit] || []).push({
-        level: curLevel,
-        tier: levels.indexOf(curLevel) + 1,
+    if (chain && (m = t.match(/^levels\s+(.+)$/))) { levels = m[1].trim().split(/\s+/); continue; }
+    const first = t.split(/\s+/)[0];
+    if (chain && levels.includes(first) && /\brequires\b/.test(t)) {
+      const second = t.split(/\s+/)[1];
+      const ci = condInfo(t.slice(t.indexOf('requires')));
+      cur = {
+        level: first,
+        kind: second === 'castle' ? 'castle' : second === 'city' ? 'city' : '',
+        tier: levels.indexOf(first) + 1,
         of: levels.length,
-        kind,
-        rate: Number(m[3]),
-        max: Number(m[4]),
-        exp: Number(m[5]),
-        facs, hr, ev,
+        facs: ci.facs, hr: ci.hr, ev: ci.ev,
+        cost: 0, time: 0, min: '',
+        effects: [], recruits: [],
+      };
+      chain.levels.push(cur);
+      continue;
+    }
+    if (!cur) continue;
+    if ((m = t.match(/^recruit_pool\s+"([^"]+)"\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+requires\s+(.*)$/))) {
+      const ci = condInfo(m[6]);
+      if (ci.aiOnly) continue; // AI-only pool
+      const rec = { rate: Number(m[3]), max: Number(m[4]), exp: Number(m[5]), facs: ci.facs, hr: ci.hr, ev: ci.ev };
+      const unit = m[1].toLowerCase();
+      (byUnit[unit] = byUnit[unit] || []).push({
+        chain: chain.name, level: cur.level, tier: cur.tier, of: cur.of, kind: cur.kind, ...rec,
       });
+      cur.recruits.push({ unit: m[1], ...rec });
+      continue;
+    }
+    if ((m = t.match(/^construction\s+(\d+)/))) { cur.time = Number(m[1]); continue; }
+    if ((m = t.match(/^cost\s+(\d+)/))) { cur.cost = Number(m[1]); continue; }
+    if ((m = t.match(/^settlement_min\s+(\w+)/))) { cur.min = m[1]; continue; }
+    if ((m = t.match(/^([a-z_]+)\s+(?:bonus\s+)?(-?\d+)(?:\s+requires\s+(.*))?$/)) && EFFECT_LABELS[m[1]]) {
+      const ci = m[3] ? condInfo('requires ' + m[3]) : { facs: [], hr: [], ev: [], aiOnly: false };
+      if (ci.aiOnly) continue;
+      cur.effects.push({ key: m[1], val: Number(m[2]), cond: (m[3] || '').trim() });
     }
   }
-  return entries;
+  return { byUnit, chains };
+}
+
+// export_descr_guilds.txt: guild -> its building chain and the guild-point
+// thresholds at which each level is offered.
+function parseGuilds(file) {
+  const byChain = {};
+  if (!fs.existsSync(file)) return byChain;
+  let guild = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const t = raw.split(';')[0].trim();
+    let m;
+    if ((m = t.match(/^Guild\s+(\S+)/i))) guild = { name: m[1], points: [] };
+    else if (guild && (m = t.match(/^building\s+(\S+)/))) byChain[m[1]] = guild;
+    else if (guild && (m = t.match(/^levels\s+(.+)$/))) guild.points = m[1].trim().split(/\s+/).map(Number);
+  }
+  return byChain;
 }
 
 // descr_sm_factions.txt: vanilla faction tag -> culture (building names are
@@ -540,6 +627,170 @@ function buildingDisplayName(bnames, level, culture, owner) {
   return name;
 }
 
+// Building description: tags are {level}_desc or {level}_<culture/faction>_desc
+// (the suffix sits before _desc), optionally with the level's first token
+// dropped, mirroring the name-tag conventions.
+function buildingDesc(bnames, level, culture, owner) {
+  const ok = (v) => v && v.length > 40 && !/do not translate/i.test(v) && !/^\{/.test(v);
+  const lk = level.toLowerCase();
+  const candidates = [lk];
+  if (lk.includes('_')) candidates.push(lk.split('_').slice(1).join('_'));
+  for (const cand of candidates) {
+    for (const suffix of [owner, culture]) {
+      if (suffix && ok(bnames[`${cand}_${suffix}_desc`.toLowerCase()])) return bnames[`${cand}_${suffix}_desc`.toLowerCase()];
+    }
+    if (ok(bnames[`${cand}_desc`])) return bnames[`${cand}_desc`];
+    for (const key of Object.keys(bnames)) {
+      if (key.startsWith(cand + '_') && key.endsWith('_desc') && ok(bnames[key])) return bnames[key];
+    }
+  }
+  return '';
+}
+
+// Building pictures live per culture: data/ui/<culture>/buildings/#<culture>_<level>.tga
+function buildBuildingPicIndex() {
+  const index = {}; // level -> { culture -> tga path }
+  const uiDir = path.join(MOD_ROOT, 'data', 'ui');
+  if (!fs.existsSync(uiDir)) return index;
+  for (const culture of fs.readdirSync(uiDir)) {
+    const dir = path.join(uiDir, culture, 'buildings');
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
+    for (const f of fs.readdirSync(dir)) {
+      const m = f.match(new RegExp(`^#${culture}_(.+)\\.tga$`, 'i'));
+      if (!m || /_constructed$/i.test(m[1])) continue;
+      const level = m[1].toLowerCase();
+      (index[level] = index[level] || {})[culture.toLowerCase()] = path.join(dir, f);
+    }
+  }
+  return index;
+}
+
+const ECON_KEYS = new Set(['trade_base_income_bonus', 'taxable_income_bonus', 'income_bonus',
+  'mine_resource', 'farming_level', 'road_level', 'trade_fleet',
+  'construction_cost_bonus_wooden', 'construction_cost_bonus_stone']);
+
+// Regional = chains locked to a rare hidden resource (Meduseld, the Tower of
+// Ecthelion, the Mûmakil network…). Broadly shared hidden resources
+// (culture/area gating) don't count.
+const CIVIC_KEYS = new Set(['religion_level', 'amplify_religion_level', 'law_bonus',
+  'happiness_bonus', 'population_growth_bonus', 'population_health_bonus',
+  'population_loyalty_bonus']);
+function chainCategory(chain, rareHr) {
+  if (chain.name.toLowerCase().includes('guild')) return 'Guilds';
+  const ls = chain.levels;
+  if (!ls.length) return 'Other';
+  if (ls.every((l) => l.hr.some((h) => rareHr.has(h)))) return 'Regional';
+  if (ls.some((l) => l.effects.some((e) => ['wall_level', 'tower_level', 'gate_strength', 'gate_defences'].includes(e.key)))) return 'Defence';
+  if (ls.some((l) => l.recruits.length)) return 'Military';
+  if (ls.some((l) => l.effects.some((e) => ECON_KEYS.has(e.key)))) return 'Economy';
+  if (ls.some((l) => l.effects.some((e) => CIVIC_KEYS.has(e.key)))) return 'Civic';
+  return 'Other';
+}
+
+// Many EDB effect lines repeat per faction with the same or near-same value
+// ("law_bonus 2 requires factions { saxons }" × 10). Group by key: plain
+// factions-only variants collapse into one value or a range; event/region
+// conditions keep a * marker with the requirement in a tooltip.
+function aggregateEffects(effects) {
+  const byKey = new Map();
+  for (const e of effects) {
+    const conditional = /event_counter|hidden_resource/.test(e.cond);
+    const k = e.key + (conditional ? '|' + e.cond : '');
+    if (!byKey.has(k)) byKey.set(k, { key: e.key, vals: [], cond: conditional ? e.cond : '' });
+    byKey.get(k).vals.push(e.val);
+  }
+  return [...byKey.values()].map((g) => {
+    const vals = [...new Set(g.vals)].sort((a, b) => a - b);
+    const label = EFFECT_LABELS[g.key];
+    const lo = vals[0];
+    const hi = vals[vals.length - 1];
+    let txt;
+    if (FLAG_KEYS.has(g.key)) txt = label;
+    else if (LEVEL_KEYS.has(g.key)) txt = label + ' level ' + (lo === hi ? lo : lo + '–' + hi);
+    else if (PCT_KEYS.has(g.key)) txt = label + ' −' + (lo === hi ? lo : lo + '–' + hi) + '%';
+    else if (lo < 0 && hi > 0) txt = label + ' ' + lo + '–+' + hi;
+    else if (hi <= 0) txt = label + ' −' + (lo === hi ? -hi : -hi + '–' + -lo);
+    else txt = label + ' +' + (lo === hi ? hi : lo + '–' + hi);
+    if (g.cond) {
+      const safe = g.cond.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      return `<span class="cond" title="requires: ${safe}">${txt}*</span>`;
+    }
+    return txt;
+  });
+}
+
+// Chain slugs must be reproducible from both pages (unit-page links point at
+// buildings.html#<slug>), so no dedupe counter — chain names are unique.
+const chainSlug = (n) => n.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+// Assembles the buildings-page model from the parsed EDB chains.
+function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType, picIndex) {
+  const facNames = (facs) => [...new Set(facs.map((f) => ownerMap[f]).filter(Boolean))];
+  // hidden resources used by at most 2 chains are unique-landmark locks
+  const hrChains = new Map();
+  for (const chain of chains) {
+    for (const l of chain.levels) {
+      for (const h of l.hr) (hrChains.get(h) || hrChains.set(h, new Set()).get(h)).add(chain.name);
+    }
+  }
+  const rareHr = new Set([...hrChains].filter(([, set]) => set.size <= 2).map(([h]) => h));
+  const out = [];
+  for (const chain of chains) {
+    if (!chain.levels.length) continue;
+    // script-marker chains (quest flags etc.): nothing buildable or shown
+    if (chain.levels.every((l) => !l.cost && !l.effects.length && !l.recruits.length)) continue;
+    // owner faction tag for name/desc/picture resolution: only when the whole
+    // chain is restricted to a single mappable faction
+    const tagSets = chain.levels.map((l) => l.facs.filter((f) => ownerMap[f]));
+    const uniqueTags = [...new Set(tagSets.flat())];
+    const owner = uniqueTags.length === 1 ? uniqueTags[0] : '';
+    const culture = (owner && cultures[owner]) || '';
+    const guild = guilds[chain.name];
+    const levels = chain.levels.map((l) => {
+      const picByCulture = picIndex[l.level.toLowerCase()] || {};
+      const tga = picByCulture[culture] || Object.values(picByCulture)[0] || '';
+      return {
+        name: buildingDisplayName(bnames, l.level, culture, owner),
+        kind: l.kind, tier: l.tier, of: l.of,
+        cost: l.cost, time: l.time,
+        min: l.min.replace(/_/g, ' '),
+        hr: l.hr.filter((h) => h !== 'unlocked').map((h) => h.replace(/_/g, ' ')), // 'unlocked' is a script flag, not a region
+        ev: l.ev.map((e) => e.replace(/_/g, ' ')),
+        facs: facNames(l.facs),
+        effects: aggregateEffects(l.effects),
+        recruits: l.recruits.map((r) => {
+          const u = unitsByType[r.unit.trim().toLowerCase()];
+          return { n: u ? u.name : r.unit, s: u ? u.slug : '', exp: r.exp };
+        }),
+        points: guild ? guild.points[l.tier - 1] : null,
+        pic: tga ? exportImage(tga, l.level, OUT_BPICS, 'buildingpics') : '',
+      };
+    });
+    // de-duplicate recruit names within a level (multiple pools per unit)
+    for (const l of levels) {
+      const seen = new Set();
+      l.recruits = l.recruits.filter((r) => !seen.has(r.n) && seen.add(r.n));
+    }
+    const first = levels[0];
+    // placeholder "names" (script-quest helpers like green_book_*) keep their
+    // raw underscores — real localized names never do
+    if (/_/.test(first.name)) continue;
+    out.push({
+      slug: chainSlug(chain.name),
+      chain: chain.name,
+      name: first.name,
+      cat: chainCategory(chain, rareHr),
+      tiers: levels.length,
+      facs: [...new Set(levels.flatMap((l) => l.facs))],
+      desc: cleanText(buildingDesc(bnames, chain.levels[0].level, culture, owner)),
+      guild: guild ? guild.name.replace(/_/g, ' ') : '',
+      pic: first.pic,
+      levels,
+    });
+  }
+  return out;
+}
+
 // --------------------------------------------------------------- EOP units
 // M2TWEOP (eopData/eopScripts) injects extra units at runtime. Active entries
 // in Units/EOPDU.lua either point at an EDU-format file under
@@ -610,7 +861,7 @@ function buildModel() {
   }
   const cardIndex = buildCardIndex();
   const portraitIndex = buildPortraitIndex();
-  const edb = parseEdb(EDB_TXT);
+  const { byUnit: edb, chains: edbChains } = parseEdb(EDB_TXT);
   const bnames = parseExportUnits(BUILDINGS_TXT); // same {tag}text format
   const facInfo = parseFactionCultures(SM_FACTIONS_TXT);
   const cultures = facInfo.culture;
@@ -654,6 +905,7 @@ function buildModel() {
   };
 
   const units = [];
+  const unitsByType = {}; // EDU type -> { name, slug }, for buildings-page links
   let missingNames = 0;
   let missingCards = 0;
   let missingPortraits = 0;
@@ -686,6 +938,7 @@ function buildModel() {
       if (!merged.has(k)) {
         merged.set(k, {
           b: buildingDisplayName(bnames, p.level, culture, owner),
+          c: chainSlug(p.chain),
           tier: p.tier, of: p.of, kind: p.kind,
           rate: p.rate, max: p.max, exp: p.exp,
           hr: new Set(p.hr), ev: new Set(p.ev), variants: 1,
@@ -732,9 +985,11 @@ function buildModel() {
     if (isMissileWeapon(u.pri)) { missile = u.pri; missileAttr = u.priAttr || []; }
     else if (isMissileWeapon(u.sec)) { missile = u.sec; missileAttr = u.secAttr || []; }
 
+    const slug = slugify(u.type);
+    unitsByType[u.type.trim().toLowerCase()] = { name, slug };
     units.push({
       name,
-      slug: slugify(u.type),
+      slug,
       faction: u.section,
       category: u.category || '',
       class: u.class || '',
@@ -804,8 +1059,20 @@ function buildModel() {
   }
 
   const factions = [...new Set(units.map((x) => x.faction))];
+
+  // Buildings & Guilds page model
+  const guilds = parseGuilds(GUILDS_TXT);
+  const buildings = buildBuildings(
+    edbChains, bnames, ownerMap, cultures, guilds, unitsByType, buildBuildingPicIndex());
+
+  // unit-page building links must only target chains the buildings page shows
+  const published = new Set(buildings.map((b) => b.slug));
+  for (const u of units) {
+    for (const r of u.recruit) if (!published.has(r.c)) r.c = '';
+  }
+
   return {
-    units, factions, projectiles, mounts,
+    units, factions, projectiles, mounts, buildings,
     missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
@@ -875,6 +1142,23 @@ header .sub {
   margin: 6px 0 0;
   font-size: 17px;
 }
+.sitenav {
+  margin: 10px 0 0;
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.sitenav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 2px 10px;
+  border-bottom: 2px solid transparent;
+}
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+a.bldlink { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--line-dark); }
+a.bldlink:hover { color: var(--accent); }
 .controls {
   position: sticky;
   top: 0;
@@ -1211,6 +1495,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
 </header>
 
 <div class="controls">
@@ -1417,7 +1702,10 @@ function detailHtml(u) {
       const conds = [];
       if (r.hr.length) conds.push('region: ' + r.hr.join(', ').replace(/_/g, ' '));
       if (r.ev.length) conds.push('event: ' + r.ev.join(', ').replace(/_/g, ' '));
-      return '<b>' + esc(r.b) + '</b> <span class="dim">(' + (r.kind ? r.kind + ', ' : '') + 'tier ' + r.tier + '/' + r.of + ')</span> — ' +
+      const bname = r.c
+        ? '<a class="bldlink" href="buildings.html#' + r.c + '"><b>' + esc(r.b) + '</b></a>'
+        : '<b>' + esc(r.b) + '</b>';
+      return bname + ' <span class="dim">(' + (r.kind ? r.kind + ', ' : '') + 'tier ' + r.tier + '/' + r.of + ')</span> — ' +
         every + ', pool ' + r.max + (r.exp ? ', +' + r.exp + ' exp' : '') +
         (conds.length ? ' <span class="dim">· ' + esc(conds.join(' · ')) + '</span>' : '');
     });
@@ -1727,11 +2015,424 @@ document.getElementById('rows').addEventListener('click', (e) => {
 if (location.hash && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
 render();
 openFromHash();
-setTimeout(() => {
-  // 'instant' overrides the page's smooth scrolling, which the browser can
-  // cancel while the page is still loading.
-  if (location.hash) document.querySelector('tr.unit.open')?.scrollIntoView({ block: 'center', behavior: 'instant' });
-}, 300);
+// 'instant' overrides the page's smooth scrolling, which the browser can
+// cancel while loading; re-assert after load because the browser's own
+// (failed) fragment-scroll can override an earlier position.
+// Late reflows (font swap, lazy images) shift the deep-linked row after the
+// first scroll; keep it centred for the first moments unless the user
+// intervenes.
+const dlScroll = () => {
+  const row = document.querySelector('tr.unit.open');
+  if (!row) return;
+  const r = row.getBoundingClientRect();
+  if (r.top < 0 || r.bottom > innerHeight) row.scrollIntoView({ block: 'center', behavior: 'instant' });
+};
+if (location.hash) {
+  let active = true;
+  const stop = () => { active = false; };
+  for (const evName of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+    window.addEventListener(evName, stop, { once: true, passive: true });
+  }
+  const tick = setInterval(() => { if (active) dlScroll(); }, 250);
+  setTimeout(() => clearInterval(tick), 3000);
+}
+</script>
+</body>
+</html>
+`;
+}
+
+// ----------------------------------------------------------- buildings page
+
+function buildBuildingsHtml(model) {
+  const bldJson = JSON.stringify(model.buildings);
+  const generated = new Date().toISOString().slice(0, 10);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Buildings &amp; Guilds</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.35;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 10px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: var(--parchment-dark);
+  border-bottom: 1px solid var(--line-dark);
+  box-shadow: 0 2px 6px rgba(60,40,10,.15);
+}
+.controls input[type=search] {
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--ink);
+  background: #fbf6e7;
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 4px 8px;
+  width: 230px;
+}
+.catbtns { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--line-dark); border-radius: 3px; overflow: hidden; }
+.catbtns button {
+  font-family: var(--display);
+  font-size: 11.5px;
+  letter-spacing: .05em;
+  padding: 5px 10px;
+  background: #fbf6e7;
+  border: none;
+  border-right: 1px solid var(--line);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.catbtns button:last-child { border-right: none; }
+.catbtns button.active { background: var(--accent); color: #f6eeda; }
+.count { font-style: italic; color: var(--ink-soft); font-size: 14px; }
+main { max-width: 1100px; margin: 0 auto; padding: 12px 14px 60px; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  position: sticky;
+  top: var(--ctrlh, 49px);
+  z-index: 10;
+  font-family: var(--display);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #f3ead2;
+  background: #4a3520;
+  padding: 6px 7px;
+  border: 1px solid #382818;
+  user-select: none;
+  white-space: nowrap;
+}
+thead th.num { text-align: right; }
+tbody td { padding: 4px 8px; border: 1px solid var(--line); font-size: 15px; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.bld { cursor: pointer; background: var(--parchment); }
+tr.bld:nth-child(even of .bld) { background: var(--row-alt); }
+tr.bld:hover { background: #e2d3ac; }
+tr.bld.open { background: #ddcda2; }
+td.name { font-weight: 600; font-size: 15.5px; }
+td.name .guildtag { font-weight: 400; font-style: italic; color: var(--gold); font-size: 13px; margin-left: 8px; }
+td.name img.bpic {
+  height: 34px;
+  width: 34px;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 8px;
+  border: 1px solid var(--line-dark);
+  border-radius: 2px;
+  background: #2e2418;
+}
+td.facs { color: var(--ink-soft); font-size: 13.5px; }
+tr.cat-row td {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: linear-gradient(90deg, var(--parchment-dark), #f0e7cf 40%, var(--parchment-dark));
+  border: 1px solid var(--line-dark);
+  border-top: 2px solid var(--line-dark);
+  padding: 7px 10px;
+  text-align: center;
+}
+tr.cat-row td .fcount { color: var(--ink-soft); font-size: 12px; letter-spacing: .05em; margin-left: 8px; }
+.dim { color: var(--ink-soft); font-size: 12.5px; }
+tr.detail td {
+  background: #faf3df;
+  border: 1px solid var(--line-dark);
+  padding: 12px 18px 14px;
+  white-space: normal;
+}
+.bdesc { font-style: italic; color: var(--ink-soft); max-width: 80ch; margin: 0 0 6px; }
+.lvl { display: flex; gap: 14px; align-items: flex-start; padding: 10px 0; border-top: 1px dotted var(--line); }
+.lvl:first-of-type { border-top: none; }
+.lvl img { width: 56px; height: 56px; object-fit: cover; border: 1px solid var(--line-dark); border-radius: 3px; background: #2e2418; flex: none; }
+.lvl .tiername { font-weight: 600; font-size: 15.5px; }
+.lvl .tiername .dim { font-weight: 400; }
+.lvl .fx, .lvl .rec, .lvl .req { font-size: 14px; margin-top: 2px; }
+.lvl .fx b, .lvl .rec b, .lvl .req b {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-right: 6px;
+}
+.cond { border-bottom: 1px dotted var(--line-dark); cursor: help; }
+a.unitlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+a.unitlink:hover { background: rgba(122,31,31,.08); }
+tr.bld.flash { animation: rowflash 1.6s ease-out; }
+@keyframes rowflash { 0% { background: #d8b86a; } 100% { background: var(--row-alt); } }
+.empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 30px; font-size: 17px; }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  tbody td { padding: 3px 5px; font-size: 13.5px; }
+  td.name { white-space: normal; }
+  .hide-xs { display: none; }
+  header h1 { font-size: 24px; }
+  .controls input[type=search] { width: 130px; }
+  main { padding: 8px 4px 60px; }
+  .lvl { flex-direction: row; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Buildings &amp; Guilds</h1>
+  <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a></nav>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search buildings&hellip;" autocomplete="off">
+  <span class="catbtns" id="cats">
+    <button data-cat="" class="active">All</button>
+    <button data-cat="Military">Military</button>
+    <button data-cat="Defence">Defence</button>
+    <button data-cat="Economy">Economy</button>
+    <button data-cat="Civic">Civic</button>
+    <button data-cat="Regional">Regional</button>
+    <button data-cat="Guilds">Guilds</button>
+    <button data-cat="Other">Other</button>
+  </span>
+  <span class="count" id="count"></span>
+</div>
+
+<main>
+  <table>
+    <thead>
+      <tr>
+        <th>Building</th>
+        <th class="num">Tiers</th>
+        <th class="num hide-xs">Cost</th>
+        <th>Factions</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden>No buildings match these filters.</div>
+</main>
+
+<footer>Generated ${generated} from <code>export_descr_buildings.txt</code> &middot; ${model.buildings.length} building chains &middot; guild levels are offered when a settlement accumulates the listed guild points &middot; * = conditional bonus (hover for the requirement)</footer>
+
+<script>
+const BLD = ${bldJson};
+BLD.forEach((b, i) => { b.id = i; });
+const CATS = ['Military', 'Defence', 'Economy', 'Civic', 'Regional', 'Guilds', 'Other'];
+const state = { q: '', cat: '', open: new Set() };
+
+const setCtrlH = () => document.documentElement.style.setProperty('--ctrlh',
+  document.querySelector('.controls').offsetHeight + 'px');
+window.addEventListener('resize', setCtrlH);
+setCtrlH();
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function matches(b) {
+  if (state.cat && b.cat !== state.cat) return false;
+  if (state.q) {
+    const q = state.q.toLowerCase();
+    const hay = (b.name + ' ' + b.levels.map(l => l.name).join(' ') + ' ' + b.facs.join(' ') + ' ' + b.guild).toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+
+function costRange(b) {
+  const costs = b.levels.map(l => l.cost).filter(c => c > 0);
+  if (!costs.length) return '<span class="dim">—</span>';
+  const lo = Math.min(...costs), hi = Math.max(...costs);
+  return lo === hi ? String(lo) : lo + '–' + hi;
+}
+
+function rowHtml(b) {
+  const pic = b.pic ? '<img class="bpic" loading="lazy" alt="" src="' + b.pic + '">' : '';
+  const facs = b.facs.length ? (b.facs.length > 4 ? b.facs.slice(0, 4).join(', ') + ' +' + (b.facs.length - 4) : b.facs.join(', ')) : 'All factions';
+  return '<tr class="bld' + (state.open.has(b.id) ? ' open' : '') + '" data-id="' + b.id + '">' +
+    '<td class="name">' + pic + esc(b.name) + (b.guild ? '<span class="guildtag">guild</span>' : '') + '</td>' +
+    '<td class="num">' + b.tiers + '</td>' +
+    '<td class="num hide-xs">' + costRange(b) + '</td>' +
+    '<td class="facs">' + esc(facs) + '</td>' +
+  '</tr>';
+}
+
+function levelHtml(l) {
+  const head = 'Tier ' + l.tier + '/' + l.of + ' — ' + esc(l.name) +
+    ' <span class="dim">' + [l.kind, l.cost ? l.cost + ' gold' : '', l.time ? l.time + (l.time === 1 ? ' turn' : ' turns') : '', l.min && l.min !== 'village' ? 'from ' + esc(l.min) : ''].filter(Boolean).join(' · ') + '</span>';
+  const parts = ['<div class="tiername">' + head + '</div>'];
+  if (l.effects.length) parts.push('<div class="fx"><b>Effects</b>' + l.effects.join(' · ') + '</div>');
+  if (l.recruits.length) {
+    parts.push('<div class="rec"><b>Recruits</b>' + l.recruits.map(r =>
+      (r.s ? '<a class="unitlink" href="index.html#' + r.s + '">' + esc(r.n) + '</a>' : esc(r.n)) +
+      (r.exp ? ' <span class="dim">+' + r.exp + ' exp</span>' : '')
+    ).join(', ') + '</div>');
+  }
+  const reqs = [];
+  if (l.points !== null && l.points !== undefined) reqs.push(l.points + ' guild points');
+  if (l.hr.length) reqs.push('region: ' + l.hr.join(', '));
+  if (l.ev.length) reqs.push('event: ' + l.ev.join(', '));
+  if (reqs.length) parts.push('<div class="req"><b>Requires</b>' + esc(reqs.join(' · ')) + '</div>');
+  const pic = l.pic ? '<img loading="lazy" alt="" src="' + l.pic + '">' : '';
+  return '<div class="lvl">' + pic + '<div>' + parts.join('') + '</div></div>';
+}
+
+function detailHtml(b) {
+  const desc = b.desc ? '<p class="bdesc">' + esc(b.desc) + '</p>' : '';
+  return '<tr class="detail"><td colspan="4">' + desc + b.levels.map(levelHtml).join('') + '</td></tr>';
+}
+
+function render() {
+  const list = BLD.filter(matches);
+  let html = '';
+  for (const cat of CATS) {
+    const group = list.filter(b => b.cat === cat);
+    if (!group.length) continue;
+    html += '<tr class="cat-row"><td colspan="4">' + cat + '<span class="fcount">' + group.length + (group.length === 1 ? ' chain' : ' chains') + '</span></td></tr>';
+    for (const b of group) {
+      html += rowHtml(b);
+      if (state.open.has(b.id)) html += detailHtml(b);
+    }
+  }
+  document.getElementById('rows').innerHTML = html;
+  document.getElementById('empty').hidden = list.length > 0;
+  document.getElementById('count').textContent = list.length + ' of ' + BLD.length + ' chains';
+}
+
+document.getElementById('q').addEventListener('input', (e) => { state.q = e.target.value.trim(); render(); });
+document.getElementById('cats').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  state.cat = btn.dataset.cat;
+  for (const x of document.querySelectorAll('.catbtns button')) x.classList.toggle('active', x === btn);
+  render();
+});
+
+function setHash(slug) {
+  history.replaceState(null, '', slug ? '#' + slug : location.pathname + location.search);
+}
+function openFromHash() {
+  const slug = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (!slug) return;
+  const b = BLD.find(x => x.slug === slug);
+  if (!b || state.open.has(b.id)) return;
+  state.q = ''; state.cat = '';
+  document.getElementById('q').value = '';
+  for (const x of document.querySelectorAll('.catbtns button')) x.classList.toggle('active', x.dataset.cat === '');
+  state.open.add(b.id);
+  render();
+  const row = document.querySelector('tr.bld[data-id="' + b.id + '"]');
+  if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
+}
+window.addEventListener('hashchange', openFromHash);
+
+document.getElementById('rows').addEventListener('click', (e) => {
+  if (e.target.closest('a')) return; // unit links navigate, don't toggle
+  const tr = e.target.closest('tr.bld');
+  if (!tr) return;
+  const id = Number(tr.dataset.id);
+  if (state.open.has(id)) {
+    state.open.delete(id);
+    if (location.hash === '#' + BLD[id].slug) setHash('');
+  } else {
+    state.open.add(id);
+    setHash(BLD[id].slug);
+  }
+  render();
+});
+
+// drop broken images (buildingpics/ folder absent)
+document.getElementById('rows').addEventListener('error', (e) => {
+  if (e.target instanceof HTMLImageElement) e.target.remove();
+}, true);
+
+if (location.hash && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+render();
+openFromHash();
+// Late reflows (font swap, lazy images) shift the deep-linked row after the
+// first scroll; keep it centred for the first moments unless the user
+// intervenes.
+const dlScroll = () => {
+  const row = document.querySelector('tr.bld.open');
+  if (!row) return;
+  const r = row.getBoundingClientRect();
+  if (r.top < 0 || r.bottom > innerHeight) row.scrollIntoView({ block: 'center', behavior: 'instant' });
+};
+if (location.hash) {
+  let active = true;
+  const stop = () => { active = false; };
+  for (const evName of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+    window.addEventListener(evName, stop, { once: true, passive: true });
+  }
+  const tick = setInterval(() => { if (active) dlScroll(); }, 250);
+  setTimeout(() => clearInterval(tick), 3000);
+}
 </script>
 </body>
 </html>
@@ -1742,12 +2443,14 @@ setTimeout(() => {
 
 const model = buildModel();
 fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
+fs.writeFileSync(OUT_BHTML, buildBuildingsHtml(model), 'utf8');
 console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections (${model.eopCount} added from eopData).`);
+console.log(`Buildings: ${model.buildings.length} chains (${model.buildings.filter((b) => b.cat === 'Guilds').length} guild chains).`);
 console.log(`${model.recruitable} units have building recruitment data; ${model.mercCount} have mercenary pools.`);
 if (model.missingNames) console.log(`${model.missingNames} units had no entry in export_units.txt (internal name used).`);
 if (model.missingCards) console.log(`${model.missingCards} units had no card image in data/ui/units/mercs.`);
 if (model.missingPortraits) console.log(`${model.missingPortraits} units had no portrait in data/ui/unit_info/merc.`);
-for (const [dir, label] of [[OUT_PORTRAITS, 'portraits/'], [OUT_CARDS, 'cards/']]) {
+for (const [dir, label] of [[OUT_PORTRAITS, 'portraits/'], [OUT_CARDS, 'cards/'], [OUT_BPICS, 'buildingpics/']]) {
   if (!fs.existsSync(dir)) continue;
   const pics = fs.readdirSync(dir).filter((f) => f.endsWith('.png'));
   const mb = pics.reduce((s, f) => s + fs.statSync(path.join(dir, f)).size, 0) / 1048576;

@@ -3,7 +3,8 @@
 Live at **https://agocompendium.com** (GitHub Pages behind Cloudflare).
 
 A self-contained website displaying every unit in the AGO mod, with names,
-descriptions, and battle stats merged from the mod's data files.
+descriptions, and battle stats merged from the mod's data files. A companion
+page, **buildings.html**, catalogues every building chain and guild.
 
 ## Viewing
 
@@ -37,6 +38,10 @@ The site is generated from:
 - `../data/world/maps/campaign/imperial_campaign/descr_mercenaries.txt` —
   region-based mercenary pools (cost, replenish rate, regions, which factions
   can hire)
+- `../data/export_descr_guilds.txt` — guild-point thresholds for guild levels
+- `../data/text/export_buildings.txt` — building names and descriptions
+- `../data/ui/<culture>/buildings/#*.tga` — building pictures (converted to
+  PNG in `buildingpics/`)
 - `../eopData/eopScripts/Units/EOPDU.lua` + `Resources/Unit_Types/*.txt` —
   extra units injected at runtime by M2TWEOP (marked with an EOP badge;
   stat-identical `rootUnit` bodyguard clones are skipped)
@@ -47,7 +52,8 @@ Whenever those files change, regenerate the page with:
 node build.js
 ```
 
-This rewrites `index.html` in place. No dependencies are needed beyond Node.
+This rewrites `index.html` and `buildings.html` in place. No dependencies are
+needed beyond Node.
 
 ## Features
 
@@ -79,3 +85,9 @@ This rewrites `index.html` in place. No dependencies are needed beyond Node.
   each row (lowest for cost, upkeep, turns and heat)
 - Mobile layout: narrow screens keep the six key columns (Unit, Men, Atk, Msl,
   Def, Cost) and show everything else in the expanded view
+- Buildings & Guilds page: all 149 building chains grouped by category
+  (Military / Defence / Economy / Civic / Regional / Guilds), each expanding
+  into a tier ladder with picture, construction cost and time, curated effects
+  (walls, law, growth, trade, upgrade tiers…), recruited units linking back to
+  the unit page, and guild-point thresholds for the 15 guild chains; unit-page
+  "Buildings" rows link across the other way
