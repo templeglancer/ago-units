@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Mechanics</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+main { max-width: 880px; margin: 0 auto; padding: 16px 14px 60px; }
+.toc {
+  text-align: center;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin: 6px 0 18px;
+}
+.toc a { color: var(--ink-soft); text-decoration: none; padding: 2px 8px; }
+.toc a:hover { color: var(--accent); }
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 2px solid var(--line-dark);
+  padding-bottom: 4px;
+  margin: 34px 0 10px;
+}
+h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 16px 0 4px;
+}
+p { margin: 0 0 10px; max-width: 70ch; }
+.note { font-style: italic; color: var(--ink-soft); font-size: 14.5px; max-width: 70ch; }
+table { border-collapse: collapse; margin: 8px 0 14px; }
+th {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 6px 14px 4px 0;
+  border-bottom: 2px solid var(--line-dark);
+}
+td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.cfg td:last-child { color: var(--ink-soft); font-size: 14.5px; }
+.cfgsec { font-family: var(--display); font-size: 11px; letter-spacing: .06em; color: var(--gold); }
+code { font-family: Consolas, monospace; font-size: 13.5px; }
+a.x { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+a.x:hover { background: rgba(122,31,31,.08); }
+.stages { max-width: 70ch; }
+.stages span { white-space: nowrap; }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  main { padding: 8px 10px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Mechanics</h1>
+  <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a></nav>
+</header>
+
+<main>
+<nav class="toc">
+  <a href="#combat">Combat</a> &middot; <a href="#ring">The One Ring</a> &middot; <a href="#palantiri">Palant&iacute;ri</a> &middot;
+  <a href="#spies">Spy networks</a> &middot; <a href="#raiding">Raiding</a> &middot; <a href="#settings">Settings</a>
+</nav>
+
+<h2 id="combat">How combat works</h2>
+<p class="note">The Medieval II engine's combat formulas were never officially documented; what follows
+is the community's settled understanding from fifteen years of testing, applied to the stats this
+site shows. It is the one part of this site not read directly from the mod's files.</p>
+
+<h3>Attack &amp; defence</h3>
+<p>Each strike rolls the attacker's <b>attack</b> against the defender's <b>defence</b>. Defence is the sum
+shown on the <a class="x" href="index.html">unit page</a>: armour&nbsp;+ defence skill&nbsp;+ shield. The three parts are not equal:
+the <b>shield</b> only protects the front and left arc (attacks from the right or rear ignore it), and
+<b>defence skill</b> counts only in melee &mdash; missiles are resisted by armour and shield alone.</p>
+<h3>Armour-piercing</h3>
+<p>Weapons with the <b>AP</b> badge halve the target's armour before the roll (skill and shield are
+unaffected). Axes, maces, crossbows and most siege ammunition are AP &mdash; the counter to
+heavily-armoured foes such as the dwarven elites with their level-7 plate.</p>
+<h3>Charge</h3>
+<p>The <b>charge bonus</b> is added to attack during the first seconds of contact, roughly until the
+formation collapses into the melee grind. A cavalry charge that connects at speed applies it with
+mass behind it &mdash; lances can double their effective attack on impact; the same unit stuck in
+prolonged melee falls back to its base attack.</p>
+<h3>Missiles</h3>
+<p>A projectile's damage comes from the <b>ammunition</b>, not the archer: the same unit hits harder
+with better arrows (the clickable ammo cards on the unit page show each projectile's damage and AP
+flag). Range and volume favour massed archers; armour blunts non-AP arrows badly, which is why
+crossbows (AP) punch above their paper attack.</p>
+<h3>Armour upgrades</h3>
+<p>Retraining at a smith adds +1 armour per level, to the cap the unit's own upgrade ladder and the
+faction's smiths allow &mdash; the caps differ widely by faction (see the
+<a class="x" href="factions.html">faction cards</a> and the smith chain on the
+<a class="x" href="buildings.html#smith">buildings page</a>).</p>
+<h3>Morale, fatigue and fear</h3>
+<p><b>Morale</b> decides when soldiers run: casualties, flanking, a dead general and fatigue all drain
+it; units marked &infin; never rout. <b>Fatigue</b> also dulls attack and defence &mdash; heat is its main
+driver, so the unit page's heat stat matters in the south. Fear effects (the Nazg&ucirc;l's dread, units
+that <i>frighten</i> nearby foes) work as a morale penalty aura.</p>
+<h3>Experience</h3>
+<p>Each chevron adds roughly +1 attack and +1 defence skill per two levels and a morale step per
+level &mdash; a gold-chevron militia regularly beats fresh professionals. Buildings that grant recruit
+experience (and the garrison veterans on the <a class="x" href="regions.html">world page</a>) start units up that ladder.</p>
+
+<h2 id="ring">The One Ring</h2>
+<p>The Ring questline arms itself at <b>turn 50</b>. From there the Ring is found, kept,
+stolen and marched across the map through 16 scripted stages:</p>
+<p class="stages"><span>Inactive</span> &rarr; <span>Spawned</span> &rarr; <span>Kept</span> &rarr; <span>March to Black Gate</span> &rarr; <span>March to Mount Doom</span> &rarr; <span>Saruman Countdown</span> &rarr; <span>Saruman</span> &rarr; <span>Sauron</span> &rarr; <span>Destroyed</span> &rarr; <span>Bring to Council</span> &rarr; <span>Bring to Mount Doom (Player)</span> &rarr; <span>Bring to Sauron (Evil)</span> &rarr; <span>Bring to Sauron (Mordor)</span> &rarr; <span>Bring to Saruman</span> &rarr; <span>Bring to Isengard</span> &rarr; <span>Ringbearer left Grey Havens</span></p>
+<p>Destroying it is not safe even at the end: an attempt at Mount Doom fails
+<b>20% of the time</b>, with the Ring slipping away to resurface elsewhere. The
+<a class="x" href="annals.html">Annals</a> hold every Ring scroll the campaign can show; each faction's
+overview on this site notes what keeping the Ring unlocks for it (the smiths of several factions
+forge level-6 armour only for a Ring-keeper).</p>
+
+<h2 id="palantiri">The Palant&iacute;ri</h2>
+<p>Six seeing-stones are hidden in fixed settlements. Holding one lets its owner scry a distant
+area every <b>5 turns</b>, revealing a radius of 7 tiles &mdash;
+or <b>15</b> for the three masters of the stones (Sauron, Saruman and Denethor).</p>
+<table><tr><th>Stone</th><th>Kept at</th></tr><tr><td>The Anor-stone</td><td>Minas Tirith</td></tr><tr><td>The Elostirion-stone</td><td>Undertowers</td></tr><tr><td>The Mirror of Galadriel</td><td>Caras Galadhon</td></tr><tr><td>The Ithil-stone</td><td>Barad-dûr</td></tr><tr><td>The Orthanc-stone</td><td>Isengard</td></tr><tr><td>Crebain of Dunland</td><td>Byrig</td></tr></table>
+
+<h2 id="spies">Spy networks</h2>
+<p>Beyond individual agents, each faction can fund a standing intelligence network against a rival,
+upgraded in four levels. Each level's chance applies per turn, per enemy settlement or army, to
+reveal it on the map:</p>
+<table><tr><th>Network level</th><th>1</th><th>2</th><th>3</th><th>4</th></tr><tr><td>Upgrade cost</td><td>free</td><td>1000 gold</td><td>2000 gold</td><td>4000 gold</td></tr><tr><td>Upkeep / turn</td><td>—</td><td>250 gold</td><td>500 gold</td><td>1000 gold</td></tr><tr><td>Reveal chance</td><td>0%</td><td>10%</td><td>20%</td><td>40%</td></tr></table>
+
+<h2 id="raiding">Raiding</h2>
+<p>Armies can raid enemy provinces for loot and slaves rather than besiege. A raided province needs
+<b>10 turns</b> to recover before it can be raided again. Loot is
+<b>60%</b> of the province's value (resources count
+&times;2; a passive raid stance yields 85%), and
+slavers take <b>25%</b> of the population. The season matters most:</p>
+<table><tr><th>Season</th><th>Loot multiplier</th></tr><tr><td>Spring</td><td>×1</td></tr><tr><td>Summer</td><td>×1.5</td></tr><tr><td>Fall</td><td>×2</td></tr><tr><td>Winter</td><td>×0.5</td></tr></table>
+<p class="note">Harvest-time raids (autumn) are four times as profitable as winter ones &mdash; the
+raiding factions (Isengard, the Goblins, the corsairs) live by this calendar.</p>
+
+<h2 id="settings">The settings file (AGO.cfg)</h2>
+<p>The mod ships a plain-text settings file next to the launcher &mdash; <code>AGO.cfg</code> &mdash;
+with 31 player toggles. Defaults as currently shipped:</p>
+<table class="cfg"><tr><th>Setting</th><th>Default</th><th>What it does</th></tr><tr><td><span class="cfgsec">[debug]</span></td><td></td><td></td></tr><tr><td><code>enable_logging</code></td><td><code>true</code></td><td>Write the AGO script log to disk</td></tr><tr><td><code>dev_debug</code></td><td><code>false</code></td><td>Verbose developer logging</td></tr><tr><td><code>log_to_console</code></td><td><code>false</code></td><td>Mirror the log to an attached console</td></tr><tr><td><span class="cfgsec">[sorting]</span></td><td></td><td></td></tr><tr><td><code>enable_sorting</code></td><td><code>true</code></td><td>Sort units in the recruitment panel</td></tr><tr><td><code>sortmode1</code></td><td><code>6</code></td><td>Primary sort mode for the recruitment panel</td></tr><tr><td><code>sortmode2</code></td><td><code>7</code></td><td>Secondary sort mode</td></tr><tr><td><code>sortmode3</code></td><td><code>4</code></td><td>Tertiary sort mode</td></tr><tr><td><code>sort_player</code></td><td><code>true</code></td><td>Apply the sorting to the player as well as the AI</td></tr><tr><td><span class="cfgsec">[limits]</span></td><td></td><td></td></tr><tr><td><code>maximum_ancillaries</code></td><td><code>16</code></td><td>How many retinue members a character can hold</td></tr><tr><td><code>guild_cooldown</code></td><td><code>3</code></td><td>Turns between guild offers</td></tr><tr><td><span class="cfgsec">[saving]</span></td><td></td><td></td></tr><tr><td><code>post_battle_saving</code></td><td><code>true</code></td><td>Autosave after each battle</td></tr><tr><td><span class="cfgsec">[info]</span></td><td></td><td></td></tr><tr><td><code>hide_army_info</code></td><td><code>true</code></td><td>Hide army details of other factions on the map</td></tr><tr><td><code>ai_raid_notification</code></td><td><code>true</code></td><td>Show a message when the AI raids your lands</td></tr><tr><td><code>watchtower_radius</code></td><td><code>10</code></td><td>Line-of-sight radius of watchtowers</td></tr><tr><td><code>enable_font_scaling</code></td><td><code>false</code></td><td>Scale UI fonts on high resolutions</td></tr><tr><td><code>custom_extent_colors</code></td><td><code>true</code></td><td>Faction-coloured borders on the campaign map</td></tr><tr><td><code>use_legacy_colors</code></td><td><code>false</code></td><td>Use the older faction colour palette</td></tr><tr><td><span class="cfgsec">[scripts]</span></td><td></td><td></td></tr><tr><td><code>natural_disasters</code></td><td><code>true</code></td><td>Enable the scripted calamities (fires, famines, storms…)</td></tr><tr><td><code>random_aa_ai_start</code></td><td><code>false</code></td><td>The AI Ar-Adûnâim expedition lands at a random spot</td></tr><tr><td><code>merge_dol_amroth</code></td><td><code>false</code></td><td>Gondor absorbs Dol Amroth at campaign start</td></tr><tr><td><code>randomized_start</code></td><td><code>false</code></td><td>Shuffle starting settlement ownership</td></tr><tr><td><code>shattered_alliances</code></td><td><code>false</code></td><td>Start without the historical alliance blocs</td></tr><tr><td><code>last_stand_armies</code></td><td><code>true</code></td><td>Factions spawn a final army at their last-stand seat</td></tr><tr><td><code>use_cinematic_intros</code></td><td><code>true</code></td><td>Play the faction intro cinematic on new campaigns</td></tr><tr><td><code>auto_return_loot</code></td><td><code>true</code></td><td>Loot returns to your treasury automatically</td></tr><tr><td><code>auto_convert_buildings</code></td><td><code>true</code></td><td>Captured settlements convert their buildings automatically</td></tr><tr><td><span class="cfgsec">[battle]</span></td><td></td><td></td></tr><tr><td><code>no_default_skirmish</code></td><td><code>true</code></td><td>Missile units do not start battles in skirmish mode</td></tr><tr><td><code>change_general_position</code></td><td><code>true</code></td><td>The general deploys behind the line, not in it</td></tr><tr><td><code>default_battle_speed</code></td><td><code>1</code></td><td>Battle speed multiplier at battle start</td></tr><tr><td><span class="cfgsec">[difficulty]</span></td><td></td><td></td></tr><tr><td><code>aggressive_rebels</code></td><td><code>true</code></td><td>Rebel armies actively attack settlements and armies</td></tr><tr><td><code>ai_free_generals</code></td><td><code>true</code></td><td>AI generals cost no upkeep</td></tr></table>
+
+</main>
+
+<footer>Generated 2026-06-12 &middot; system constants read from the eopData campaign scripts and AGO.cfg &middot; the combat primer reflects community-established engine behaviour</footer>
+</body>
+</html>

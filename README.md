@@ -15,7 +15,12 @@ scripted battle abilities with effects and earning requirements) and **regions.h
 mix, regional traits, scripted garrisons and local rebel forces, plus the
 minor settlements and scripted landmarks) and **annals.html** (all 557
 event scrolls the campaign can show, grouped by faction with search, plus
-the natural-calamity scrolls).
+the natural-calamity scrolls) and **mechanics.html** (a reference for the
+game systems: a combat primer - attack/defence, armour-piercing, charge,
+missiles, morale, experience, clearly marked as community-established
+engine knowledge - plus the One Ring constants and stages, the six
+Palantiri, spy-network costs, raiding multipliers and every AGO.cfg
+player toggle with a description).
 
 ## Viewing
 

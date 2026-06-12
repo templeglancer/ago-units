@@ -1529,6 +1529,71 @@ function buildWorld(ownerMap, unitsByType) {
   return { regions: out, minors, landmarks: parseLandmarks() };
 }
 
+// --------------------------------------------------------------- mechanics
+// Curated game-system constants read from the eopData scripts, plus the
+// player-facing AGO.cfg toggles. The combat primer on the page is authored
+// text, not parsed data.
+function buildMechanics() {
+  const rd = (f) => fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
+  const num = (src, re, dflt) => Number((src.match(re) || [])[1] || dflt);
+  const ring = rd(path.join(EOP_SCRIPTS, 'Campaign', 'oneRing.lua'));
+  const spy = rd(path.join(EOP_SCRIPTS, 'Campaign', 'spyNetworks.lua'));
+  const raid = rd(path.join(EOP_SCRIPTS, 'Campaign', 'raiding.lua'));
+  const pal = rd(path.join(EOP_SCRIPTS, 'Campaign', 'palantir.lua'));
+  const rnames = parseExportUnits(REGION_NAMES_TXT);
+  const arr = (src, key) => ((src.match(new RegExp(key + '\\s*=\\s*\\{([^}]*)\\}')) || [])[1] || '')
+    .split(',').map((s) => s.trim()).filter((s) => /^\d+$/.test(s)).map(Number);
+  const stones = [...pal.matchAll(/\["(\w+)"\]\s*=\s*\{\s*name\s*=\s*"([^"]+)"/g)].map((m) => ({
+    place: cleanText(rnames[m[1].toLowerCase()] || '') || m[1].replace(/_/g, ' '),
+    stone: m[2],
+  }));
+  return {
+    ring: {
+      start: num(ring, /START_TURN\s*=\s*(\d+)/, 50),
+      failChance: num(ring, /DESTROY_FAIL_CHANCE\s*=\s*(\d+)/, 20),
+      stages: [...(ring.match(/RING_STAGE_STRINGS\s*=\s*\{([\s\S]*?)\}/) || ['', ''])[1]
+        .matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+    },
+    spy: {
+      cost: arr(spy, 'upgradeCosts'),
+      upkeep: arr(spy, 'upkeepCosts'),
+      reveal: arr(spy, 'settlementRevealChance'),
+    },
+    raid: {
+      cooldown: num(raid, /RAID_COOLDOWN\s*=\s*(\d+)/, 0),
+      loot: num(raid, /LOOT_MULTIPLIER\s*=\s*([\d.]+)/, 0),
+      lootRes: num(raid, /LOOT_RESOURCE_MULTIPLIER\s*=\s*([\d.]+)/, 0),
+      lootPassive: num(raid, /LOOT_PASSIVE_MULTIPLIER\s*=\s*([\d.]+)/, 0),
+      slave: num(raid, /SLAVE_MULTIPLIER\s*=\s*([\d.]+)/, 0),
+      seasons: {
+        Spring: num(raid, /Spring\]\s*=\s*([\d.]+)/, 1),
+        Summer: num(raid, /Summer\]\s*=\s*([\d.]+)/, 1),
+        Fall: num(raid, /Fall\]\s*=\s*([\d.]+)/, 1),
+        Winter: num(raid, /Winter\]\s*=\s*([\d.]+)/, 1),
+      },
+    },
+    palantir: {
+      stones,
+      power: num(pal, /\bpower\s*=\s*(\d+)/, 7),
+      boosted: num(pal, /boostedPower\s*=\s*(\d+)/, 15),
+      cooldown: num(pal, /cooldown\s*=\s*(\d+)/, 5),
+    },
+    cfg: (() => {
+      const file = path.join(MOD_ROOT, 'AGO.cfg');
+      const out = [];
+      let sec = '';
+      if (!fs.existsSync(file)) return out;
+      for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+        const t = raw.split(/[;#]/)[0].trim();
+        let m;
+        if ((m = t.match(/^\[(\w+)\]/))) sec = m[1];
+        else if ((m = t.match(/^(\w+)\s*=\s*(\S+)/))) out.push({ sec, k: m[1], v: m[2] });
+      }
+      return out;
+    })(),
+  };
+}
+
 // ------------------------------------------------------------ annals: events
 // text/historic_events.txt: the 560 event scrolls the campaign can show,
 // as {TAG_TITLE}/{TAG_BODY} pairs. The owning faction is recoverable from
@@ -2186,9 +2251,10 @@ function buildModel() {
   const characters = buildCharacters(ownerMap, cultures, unitsByType);
   const world = buildWorld(ownerMap, unitsByType);
   const annals = buildAnnals(ownerMap);
+  const mechanics = buildMechanics();
 
   return {
-    units, factions, projectiles, mounts, buildings, factionPages, characters, world, annals,
+    units, factions, projectiles, mounts, buildings, factionPages, characters, world, annals, mechanics,
     missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
@@ -2611,7 +2677,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
 </header>
 
 <div class="controls">
@@ -3416,7 +3482,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
 </header>
 
 <div class="controls">
@@ -3942,7 +4008,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4349,7 +4415,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
 </header>
 
 <div class="controls">
@@ -4761,7 +4827,7 @@ footer {
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a></nav>
 </header>
 
 <div class="controls">
@@ -5087,7 +5153,7 @@ footer {
 <header>
   <h1>AGO &mdash; Annals</h1>
   <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a></nav>
 </header>
 
 <div class="controls">
@@ -5189,6 +5255,291 @@ render();
 `;
 }
 
+// --------------------------------------------------------- mechanics page html
+
+// Short player-facing descriptions for the AGO.cfg toggles. Authored here —
+// the cfg file itself carries no comments.
+const CFG_DESCR = {
+  enable_logging: 'Write the AGO script log to disk',
+  dev_debug: 'Verbose developer logging',
+  log_to_console: 'Mirror the log to an attached console',
+  enable_sorting: 'Sort units in the recruitment panel',
+  sortmode1: 'Primary sort mode for the recruitment panel',
+  sortmode2: 'Secondary sort mode',
+  sortmode3: 'Tertiary sort mode',
+  sort_player: 'Apply the sorting to the player as well as the AI',
+  maximum_ancillaries: 'How many retinue members a character can hold',
+  guild_cooldown: 'Turns between guild offers',
+  post_battle_saving: 'Autosave after each battle',
+  hide_army_info: 'Hide army details of other factions on the map',
+  ai_raid_notification: 'Show a message when the AI raids your lands',
+  watchtower_radius: 'Line-of-sight radius of watchtowers',
+  enable_font_scaling: 'Scale UI fonts on high resolutions',
+  custom_extent_colors: 'Faction-coloured borders on the campaign map',
+  use_legacy_colors: 'Use the older faction colour palette',
+  natural_disasters: 'Enable the scripted calamities (fires, famines, storms…)',
+  random_aa_ai_start: 'The AI Ar-Adûnâim expedition lands at a random spot',
+  merge_dol_amroth: 'Gondor absorbs Dol Amroth at campaign start',
+  randomized_start: 'Shuffle starting settlement ownership',
+  shattered_alliances: 'Start without the historical alliance blocs',
+  last_stand_armies: 'Factions spawn a final army at their last-stand seat',
+  use_cinematic_intros: 'Play the faction intro cinematic on new campaigns',
+  auto_return_loot: 'Loot returns to your treasury automatically',
+  auto_convert_buildings: 'Captured settlements convert their buildings automatically',
+  no_default_skirmish: 'Missile units do not start battles in skirmish mode',
+  change_general_position: 'The general deploys behind the line, not in it',
+  default_battle_speed: 'Battle speed multiplier at battle start',
+  aggressive_rebels: 'Rebel armies actively attack settlements and armies',
+  ai_free_generals: 'AI generals cost no upkeep',
+};
+
+function buildMechanicsHtml(model) {
+  const m = model.mechanics;
+  const generated = new Date().toISOString().slice(0, 10);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const row = (cells, head) => '<tr>' + cells.map((c) => '<t' + (head ? 'h' : 'd') + '>' + c + '</t' + (head ? 'h' : 'd') + '>').join('') + '</tr>';
+
+  const spyTable = '<table>' + row(['Network level', '1', '2', '3', '4'], true) +
+    row(['Upgrade cost', ...m.spy.cost.map((v) => v ? v + ' gold' : 'free')]) +
+    row(['Upkeep / turn', ...m.spy.upkeep.map((v) => v ? v + ' gold' : '—')]) +
+    row(['Reveal chance', ...m.spy.reveal.map((v) => v + '%')]) + '</table>';
+
+  const raidTable = '<table>' + row(['Season', 'Loot multiplier'], true) +
+    Object.entries(m.raid.seasons).map(([s, v]) => row([s, '×' + v])).join('') + '</table>';
+
+  const palTable = '<table>' + row(['Stone', 'Kept at'], true) +
+    m.palantir.stones.map((s) => row([esc(s.stone), esc(s.place)])).join('') + '</table>';
+
+  const cfgRows = (() => {
+    let html = '';
+    let sec = '';
+    for (const c of model.mechanics.cfg) {
+      if (c.sec !== sec) {
+        sec = c.sec;
+        html += row(['<span class="cfgsec">[' + esc(sec) + ']</span>', '', ''], false);
+      }
+      html += row(['<code>' + esc(c.k) + '</code>', '<code>' + esc(c.v) + '</code>', esc(CFG_DESCR[c.k] || '')]);
+    }
+    return '<table class="cfg">' + row(['Setting', 'Default', 'What it does'], true) + html + '</table>';
+  })();
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Mechanics</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+main { max-width: 880px; margin: 0 auto; padding: 16px 14px 60px; }
+.toc {
+  text-align: center;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin: 6px 0 18px;
+}
+.toc a { color: var(--ink-soft); text-decoration: none; padding: 2px 8px; }
+.toc a:hover { color: var(--accent); }
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 2px solid var(--line-dark);
+  padding-bottom: 4px;
+  margin: 34px 0 10px;
+}
+h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 16px 0 4px;
+}
+p { margin: 0 0 10px; max-width: 70ch; }
+.note { font-style: italic; color: var(--ink-soft); font-size: 14.5px; max-width: 70ch; }
+table { border-collapse: collapse; margin: 8px 0 14px; }
+th {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 6px 14px 4px 0;
+  border-bottom: 2px solid var(--line-dark);
+}
+td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.cfg td:last-child { color: var(--ink-soft); font-size: 14.5px; }
+.cfgsec { font-family: var(--display); font-size: 11px; letter-spacing: .06em; color: var(--gold); }
+code { font-family: Consolas, monospace; font-size: 13.5px; }
+a.x { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+a.x:hover { background: rgba(122,31,31,.08); }
+.stages { max-width: 70ch; }
+.stages span { white-space: nowrap; }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  main { padding: 8px 10px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Mechanics</h1>
+  <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a></nav>
+</header>
+
+<main>
+<nav class="toc">
+  <a href="#combat">Combat</a> &middot; <a href="#ring">The One Ring</a> &middot; <a href="#palantiri">Palant&iacute;ri</a> &middot;
+  <a href="#spies">Spy networks</a> &middot; <a href="#raiding">Raiding</a> &middot; <a href="#settings">Settings</a>
+</nav>
+
+<h2 id="combat">How combat works</h2>
+<p class="note">The Medieval II engine's combat formulas were never officially documented; what follows
+is the community's settled understanding from fifteen years of testing, applied to the stats this
+site shows. It is the one part of this site not read directly from the mod's files.</p>
+
+<h3>Attack &amp; defence</h3>
+<p>Each strike rolls the attacker's <b>attack</b> against the defender's <b>defence</b>. Defence is the sum
+shown on the <a class="x" href="index.html">unit page</a>: armour&nbsp;+ defence skill&nbsp;+ shield. The three parts are not equal:
+the <b>shield</b> only protects the front and left arc (attacks from the right or rear ignore it), and
+<b>defence skill</b> counts only in melee &mdash; missiles are resisted by armour and shield alone.</p>
+<h3>Armour-piercing</h3>
+<p>Weapons with the <b>AP</b> badge halve the target's armour before the roll (skill and shield are
+unaffected). Axes, maces, crossbows and most siege ammunition are AP &mdash; the counter to
+heavily-armoured foes such as the dwarven elites with their level-7 plate.</p>
+<h3>Charge</h3>
+<p>The <b>charge bonus</b> is added to attack during the first seconds of contact, roughly until the
+formation collapses into the melee grind. A cavalry charge that connects at speed applies it with
+mass behind it &mdash; lances can double their effective attack on impact; the same unit stuck in
+prolonged melee falls back to its base attack.</p>
+<h3>Missiles</h3>
+<p>A projectile's damage comes from the <b>ammunition</b>, not the archer: the same unit hits harder
+with better arrows (the clickable ammo cards on the unit page show each projectile's damage and AP
+flag). Range and volume favour massed archers; armour blunts non-AP arrows badly, which is why
+crossbows (AP) punch above their paper attack.</p>
+<h3>Armour upgrades</h3>
+<p>Retraining at a smith adds +1 armour per level, to the cap the unit's own upgrade ladder and the
+faction's smiths allow &mdash; the caps differ widely by faction (see the
+<a class="x" href="factions.html">faction cards</a> and the smith chain on the
+<a class="x" href="buildings.html#smith">buildings page</a>).</p>
+<h3>Morale, fatigue and fear</h3>
+<p><b>Morale</b> decides when soldiers run: casualties, flanking, a dead general and fatigue all drain
+it; units marked &infin; never rout. <b>Fatigue</b> also dulls attack and defence &mdash; heat is its main
+driver, so the unit page's heat stat matters in the south. Fear effects (the Nazg&ucirc;l's dread, units
+that <i>frighten</i> nearby foes) work as a morale penalty aura.</p>
+<h3>Experience</h3>
+<p>Each chevron adds roughly +1 attack and +1 defence skill per two levels and a morale step per
+level &mdash; a gold-chevron militia regularly beats fresh professionals. Buildings that grant recruit
+experience (and the garrison veterans on the <a class="x" href="regions.html">world page</a>) start units up that ladder.</p>
+
+<h2 id="ring">The One Ring</h2>
+<p>The Ring questline arms itself at <b>turn ${m.ring.start}</b>. From there the Ring is found, kept,
+stolen and marched across the map through ${m.ring.stages.length} scripted stages:</p>
+<p class="stages">${m.ring.stages.map((s) => '<span>' + esc(s) + '</span>').join(' &rarr; ')}</p>
+<p>Destroying it is not safe even at the end: an attempt at Mount Doom fails
+<b>${m.ring.failChance}% of the time</b>, with the Ring slipping away to resurface elsewhere. The
+<a class="x" href="annals.html">Annals</a> hold every Ring scroll the campaign can show; each faction's
+overview on this site notes what keeping the Ring unlocks for it (the smiths of several factions
+forge level-6 armour only for a Ring-keeper).</p>
+
+<h2 id="palantiri">The Palant&iacute;ri</h2>
+<p>Six seeing-stones are hidden in fixed settlements. Holding one lets its owner scry a distant
+area every <b>${m.palantir.cooldown} turns</b>, revealing a radius of ${m.palantir.power} tiles &mdash;
+or <b>${m.palantir.boosted}</b> for the three masters of the stones (Sauron, Saruman and Denethor).</p>
+${palTable}
+
+<h2 id="spies">Spy networks</h2>
+<p>Beyond individual agents, each faction can fund a standing intelligence network against a rival,
+upgraded in four levels. Each level's chance applies per turn, per enemy settlement or army, to
+reveal it on the map:</p>
+${spyTable}
+
+<h2 id="raiding">Raiding</h2>
+<p>Armies can raid enemy provinces for loot and slaves rather than besiege. A raided province needs
+<b>${m.raid.cooldown} turns</b> to recover before it can be raided again. Loot is
+<b>${Math.round(m.raid.loot * 100)}%</b> of the province's value (resources count
+&times;${m.raid.lootRes}; a passive raid stance yields ${Math.round(m.raid.lootPassive * 100)}%), and
+slavers take <b>${Math.round(m.raid.slave * 100)}%</b> of the population. The season matters most:</p>
+${raidTable}
+<p class="note">Harvest-time raids (autumn) are four times as profitable as winter ones &mdash; the
+raiding factions (Isengard, the Goblins, the corsairs) live by this calendar.</p>
+
+<h2 id="settings">The settings file (AGO.cfg)</h2>
+<p>The mod ships a plain-text settings file next to the launcher &mdash; <code>AGO.cfg</code> &mdash;
+with ${model.mechanics.cfg.length} player toggles. Defaults as currently shipped:</p>
+${cfgRows}
+
+</main>
+
+<footer>Generated ${generated} &middot; system constants read from the eopData campaign scripts and AGO.cfg &middot; the combat primer reflects community-established engine behaviour</footer>
+</body>
+</html>
+`;
+}
+
 // ---------------------------------------------------------------------- run
 
 const model = buildModel();
@@ -5201,6 +5552,8 @@ fs.writeFileSync(OUT_RHTML, buildWorldHtml(model), 'utf8');
 console.log(`World page: ${model.world.regions.length} provinces, ${model.world.minors.length} minor settlements, ${model.world.landmarks.length} landmarks.`);
 fs.writeFileSync(OUT_AHTML, buildAnnalsHtml(model), 'utf8');
 console.log(`Annals page: ${model.annals.events.length} event scrolls, ${model.annals.disasters.length} calamities.`);
+fs.writeFileSync(path.join(__dirname, 'mechanics.html'), buildMechanicsHtml(model), 'utf8');
+console.log(`Mechanics page: ${model.mechanics.cfg.length} settings, ${model.mechanics.palantir.stones.length} palantiri, ${model.mechanics.ring.stages.length} ring stages.`);
 
 // prune building pictures the model no longer references (default pics are
 // now culture-suffixed, orphaning the old unsuffixed exports)
