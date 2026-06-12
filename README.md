@@ -5,8 +5,10 @@ Live at **https://agocompendium.com** (GitHub Pages behind Cloudflare).
 A self-contained website displaying every unit in the AGO mod, with names,
 descriptions, and battle stats merged from the mod's data files. Companion
 pages: **buildings.html** (every building chain and guild, with a settlement
-tech-tree view) and **factions.html** (campaign overviews for all 26 playable
-factions).
+tech-tree view), **factions.html** (campaign overviews and questlines for all
+26 playable factions) and **characters.html** (every visible character trait
+with its level thresholds, effects and earning triggers, plus the full
+retinue of followers and items).
 
 ## Viewing
 
@@ -129,6 +131,12 @@ needed beyond Node.
   (factions differ widely: level 3 for Rohan, level 7 for the dwarven realms)
   with event-unlocked levels noted separately, linking to the smith chain on
   the buildings page
+- Characters page (`characters.html`): 566 visible traits (generals' and
+  agents') with their level ladders ("Brave → Dauntless → … at 1/2/4/8/16
+  points"), effects, opposed traits, and — invisible in game — the triggers
+  that award the points (when they fire, their conditions with game faction
+  names, and the chance); plus all 826 retinue followers and items with
+  pictures (`ancpics/`), effects and acquisition triggers
 - Questlines & campaign scripts: every faction card lists its unique quests
   and scripted features (95 across the 26 factions, from the in-game faction
   overview in `eopData/.../factionOverviews.lua`) — rendered as a chronicle

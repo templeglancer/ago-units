@@ -30,6 +30,13 @@ const OUT_BHTML = path.join(__dirname, 'buildings.html');
 const OUT_PORTRAITS = path.join(__dirname, 'portraits');
 const OUT_CARDS = path.join(__dirname, 'cards');
 const OUT_BPICS = path.join(__dirname, 'buildingpics');
+const TRAITS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_character_traits.txt');
+const ANCS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_ancillaries.txt');
+const VNVS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_VnVs.txt');
+const ANC_TEXT_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_ancillaries.txt');
+const ANC_IMG_DIR = path.join(MOD_ROOT, 'data', 'ui', 'ancillaries');
+const OUT_CHTML = path.join(__dirname, 'characters.html');
+const OUT_APICS = path.join(__dirname, 'ancpics');
 
 // ------------------------------------------------------------- TGA -> PNG
 
@@ -950,7 +957,7 @@ function makePretty(ownerMap, cultures) {
   const event = (e) => {
     const m = e.match(/^([a-z]+)_allied_([a-z]+)$/);
     if (m && ownerMap[m[1]] && ownerMap[m[2]]) return 'alliance: ' + ownerMap[m[1]] + ' & ' + ownerMap[m[2]];
-    return e.split('_').map((w) => ownerMap[w] || w).join(' ');
+    return e.split('_').map((w) => ownerMap[w] || camelWords(w)).join(' ');
   };
   const cond = (c) => c
     .replace(/factions\s*\{([^}]*)\}/g, (m, inner) =>
@@ -1171,6 +1178,210 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
     });
   }
   return out;
+}
+
+// ------------------------------------------------ characters: traits & retinue
+// export_descr_character_traits.txt: traits (levels with point thresholds and
+// effects) plus the triggers that award the points. Display names and
+// descriptions are in text/export_VnVs.txt; levels whose localized name is
+// "Hidden"/"Biography" (and traits flagged Hidden) are engine plumbing.
+
+function parseTraits(file) {
+  const traits = [];
+  const triggers = [];
+  if (!fs.existsSync(file)) return { traits, triggers };
+  let cur = null;
+  let lvl = null;
+  let trg = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const s = raw.split(';')[0].trim();
+    if (!s) continue;
+    let m;
+    if ((m = s.match(/^Trait\s+(\S+)/))) {
+      cur = { name: m[1], who: '', anti: [], hidden: false, levels: [] };
+      traits.push(cur); lvl = null; trg = null; continue;
+    }
+    if (/^Trigger\s+\S+/.test(s)) {
+      trg = { when: '', conds: [], affects: [] };
+      triggers.push(trg); cur = null; lvl = null; continue;
+    }
+    if (trg) {
+      if ((m = s.match(/^WhenToTest\s+(\S+)/))) trg.when = m[1];
+      else if ((m = s.match(/^Condition\s+(.*)$/))) trg.conds.push(m[1].trim());
+      else if ((m = s.match(/^and\s+(.*)$/))) trg.conds.push(m[1].trim());
+      else if ((m = s.match(/^Affects\s+(\S+)\s+(\d+)\s+Chance\s+(\d+)/i))) {
+        trg.affects.push({ trait: m[1], pts: Number(m[2]), chance: Number(m[3]) });
+      }
+      continue;
+    }
+    if (!cur) continue;
+    if ((m = s.match(/^Characters\s+(.*)$/))) cur.who = m[1].trim();
+    else if (s === 'Hidden') cur.hidden = true;
+    else if ((m = s.match(/^AntiTraits\s+(.*)$/))) cur.anti = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+    else if ((m = s.match(/^Level\s+(\S+)/))) { lvl = { name: m[1], thr: 0, fx: [] }; cur.levels.push(lvl); }
+    else if (lvl && (m = s.match(/^Description\s+(\S+)/))) lvl.desc = m[1];
+    else if (lvl && (m = s.match(/^EffectsDescription\s+(\S+)/))) lvl.fxdesc = m[1];
+    else if (lvl && (m = s.match(/^Threshold\s+(\d+)/))) lvl.thr = Number(m[1]);
+    else if (lvl && (m = s.match(/^Effect\s+(\S+)\s+(-?\d+)/))) lvl.fx.push({ k: m[1], v: Number(m[2]) });
+  }
+  return { traits, triggers };
+}
+
+// export_descr_ancillaries.txt: retinue members and items, plus their
+// AcquireAncillary triggers. Localized text in text/export_ancillaries.txt.
+function parseAncillaries(file) {
+  const ancs = [];
+  const triggers = [];
+  if (!fs.existsSync(file)) return { ancs, triggers };
+  let cur = null;
+  let trg = null;
+  for (const raw of fs.readFileSync(file, 'latin1').split(/\r?\n/)) {
+    const s = raw.split(';')[0].trim();
+    if (!s) continue;
+    let m;
+    if ((m = s.match(/^Ancillary\s+(\S+)/))) {
+      cur = { name: m[1], type: '', image: '', excluded: [], fx: [] };
+      ancs.push(cur); trg = null; continue;
+    }
+    if (/^Trigger\s+\S+/.test(s)) {
+      trg = { when: '', conds: [], affects: [] };
+      triggers.push(trg); cur = null; continue;
+    }
+    if (trg) {
+      if ((m = s.match(/^WhenToTest\s+(\S+)/))) trg.when = m[1];
+      else if ((m = s.match(/^Condition\s+(.*)$/))) trg.conds.push(m[1].trim());
+      else if ((m = s.match(/^and\s+(.*)$/))) trg.conds.push(m[1].trim());
+      else if ((m = s.match(/^AcquireAncillary\s+(\S+)\s+chance\s+(\d+)/i))) {
+        trg.affects.push({ anc: m[1], chance: Number(m[2]) });
+      }
+      continue;
+    }
+    if (!cur) continue;
+    if ((m = s.match(/^Type\s+(\S+)/))) cur.type = m[1];
+    else if ((m = s.match(/^Image\s+(\S+)/))) cur.image = m[1];
+    else if ((m = s.match(/^ExcludedAncillaries\s+(.*)$/))) cur.excluded = m[1].split(',').map((x) => x.trim()).filter(Boolean);
+    else if ((m = s.match(/^Effect\s+(\S+)\s+(-?\d+)/))) cur.fx.push({ k: m[1], v: Number(m[2]) });
+  }
+  return { ancs, triggers };
+}
+
+const WHEN_LABELS = {
+  PostBattle: 'after a battle',
+  CharacterTurnEnd: 'at turn end',
+  CharacterTurnStart: 'at turn start',
+  CharacterTurnEndInSettlement: 'at turn end, in a settlement',
+  GeneralCaptureSettlement: 'on capturing a settlement',
+  CharacterComesOfAge: 'on coming of age',
+  OfferedForMarriage: 'when offered for marriage',
+  OfferedForAdoption: 'when offered for adoption',
+  LesserGeneralOfferedForAdoption: 'when a captain is offered adoption',
+  AgentCreated: 'when the agent is recruited',
+  GovernorBuildingCompleted: 'when a building completes',
+  CharacterMarries: 'on marriage',
+  GovernorUnitTrained: 'when a unit is trained',
+};
+const camelWords = (x) => x.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+
+function buildCharacters(ownerMap) {
+  const vnv = parseExportUnits(VNVS_TXT);
+  const atxt = parseExportUnits(ANC_TEXT_TXT);
+  const td = parseTraits(TRAITS_TXT);
+  const ad = parseAncillaries(ANCS_TXT);
+  // engine condition lines, lightly humanized; faction tags become game names
+  const condTxt = (c) => c
+    .replace(/\bI_EventCounter\b/g, 'event')
+    .replace(/\bFactionType\b|\bFactionIsLocal\b/g, 'faction')
+    .split(/\s+/).map((w) => ownerMap[w] || camelWords(w)).join(' ')
+    .replace(/_/g, ' ');
+  const whenTxt = (w) => WHEN_LABELS[w] || camelWords(w).toLowerCase();
+  const earnLine = (t) => ({
+    w: whenTxt(t.when),
+    c: t.conds.map(condTxt).join(' · '),
+    p: t.pts || 0,
+    ch: t.chance,
+  });
+  // triggers grouped by the trait/ancillary they award
+  const trgByTrait = {};
+  for (const tg of td.triggers) {
+    for (const a of tg.affects) {
+      (trgByTrait[a.trait] = trgByTrait[a.trait] || []).push(earnLine({ ...tg, pts: a.pts, chance: a.chance }));
+    }
+  }
+  const trgByAnc = {};
+  for (const tg of ad.triggers) {
+    for (const a of tg.affects) {
+      (trgByAnc[a.anc] = trgByAnc[a.anc] || []).push(earnLine({ ...tg, chance: a.chance }));
+    }
+  }
+  const seen = new Set();
+  const slug = (base) => {
+    let s = base.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    let n = 2;
+    const root = s;
+    while (seen.has(s)) s = root + '-' + n++;
+    seen.add(s);
+    return s;
+  };
+  const rawFx = (fx) => fx.map((e) => camelWords(e.k) + ' ' + (e.v > 0 ? '+' : '') + e.v).join(', ');
+  // the text files often hold the literal placeholder "Auto-generated ..." —
+  // the game composes those lines from the Effect entries, and so do we
+  const fxText = (loc, fx) => (loc && !/auto.?generated/i.test(loc)) ? loc : rawFx(fx);
+  // first pass: resolve display levels so anti-trait names can cross-reference
+  const resolved = td.traits.map((tr) => ({
+    tr,
+    levels: tr.levels.map((l) => ({
+      name: cleanText(vnv[l.name.toLowerCase()] || ''),
+      thr: l.thr,
+      desc: cleanText(vnv[(l.desc || '').toLowerCase()] || ''),
+      fx: fxText(cleanText(vnv[(l.fxdesc || '').toLowerCase()] || ''), l.fx),
+    })).filter((l) => l.name && !/^(hidden|biography)$/i.test(l.name)),
+  }));
+  const displayOf = {};
+  for (const r of resolved) if (r.levels.length) displayOf[r.tr.name] = r.levels[0].name;
+  const traits = [];
+  for (const r of resolved) {
+    const tr = r.tr;
+    if (tr.hidden || !r.levels.length || tr.name === 'Test') continue;
+    const who = /family/.test(tr.who) ? 'Generals'
+      : tr.who.trim() === 'all' ? 'All characters'
+      : tr.who.split(',').map((x) => x.trim()).map((x) => x[0].toUpperCase() + x.slice(1)).join(', ');
+    traits.push({
+      slug: slug('t-' + tr.name),
+      name: r.levels[0].name,
+      who,
+      agent: !/family/.test(tr.who),
+      anti: tr.anti.map((a) => displayOf[a]).filter(Boolean),
+      levels: r.levels,
+      earn: trgByTrait[tr.name] || [],
+    });
+  }
+  // ancillary images: the Image field's case rarely matches the files on disk
+  const imgIndex = {};
+  if (fs.existsSync(ANC_IMG_DIR)) {
+    for (const f of fs.readdirSync(ANC_IMG_DIR)) imgIndex[f.toLowerCase()] = path.join(ANC_IMG_DIR, f);
+  }
+  const TYPE_LABELS = {
+    follower: 'Follower', item: 'Item', weapon_primary: 'Weapon', armour: 'Armour',
+    king: 'King', court: 'Court', spy_network: 'Spy network', NextHeir: 'Heirloom',
+  };
+  const ancs = [];
+  for (const a of ad.ancs) {
+    const name = cleanText(atxt[a.name.toLowerCase()] || '');
+    if (!name || /^(hidden|biography)$/i.test(name)) continue;
+    const tga = a.image && imgIndex[a.image.toLowerCase()];
+    ancs.push({
+      slug: slug('a-' + a.name),
+      name,
+      type: TYPE_LABELS[a.type] || camelWords((a.type || '').replace(/^./, (c) => c.toUpperCase())),
+      img: tga ? exportImage(tga, 'anc_' + a.name, OUT_APICS, 'ancpics') : '',
+      desc: cleanText(atxt[a.name.toLowerCase() + '_desc'] || ''),
+      fx: fxText(cleanText(atxt[a.name.toLowerCase() + '_effects_desc'] || ''), a.fx),
+      earn: trgByAnc[a.name] || [],
+    });
+  }
+  traits.sort((a, b) => a.name.localeCompare(b.name));
+  ancs.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+  return { traits, ancs };
 }
 
 // --------------------------------------------------------------- EOP units
@@ -1451,9 +1662,10 @@ function buildModel() {
   }
 
   const factionPages = buildFactionsModel(units, ownerMap, unitsByType, edbChains, buildings, guilds, cultures);
+  const characters = buildCharacters(ownerMap);
 
   return {
-    units, factions, projectiles, mounts, buildings, factionPages,
+    units, factions, projectiles, mounts, buildings, factionPages, characters,
     missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
@@ -1876,7 +2088,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a></nav>
 </header>
 
 <div class="controls">
@@ -2681,7 +2893,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a></nav>
 </header>
 
 <div class="controls">
@@ -3206,7 +3418,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a></nav>
 </header>
 
 <main id="main"></main>
@@ -3416,12 +3628,337 @@ if (location.hash) {
 `;
 }
 
+// ------------------------------------------------------- characters page html
+
+function buildCharactersHtml(model) {
+  const trJson = JSON.stringify(model.characters.traits);
+  const anJson = JSON.stringify(model.characters.ancs);
+  const generated = new Date().toISOString().slice(0, 10);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Characters</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.35;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--parchment-dark);
+  border-bottom: 1px solid var(--line-dark);
+}
+.controls input[type="search"] {
+  font: inherit;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 5px 9px;
+  width: 230px;
+}
+.catbtns { display: flex; flex-wrap: wrap; gap: 4px; }
+.catbtns button {
+  font-family: var(--display);
+  font-size: 11.5px;
+  letter-spacing: .05em;
+  background: var(--parchment);
+  color: var(--ink-soft);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.catbtns button.active { background: var(--accent); border-color: var(--accent); color: #f6eeda; }
+.count { margin-left: auto; color: var(--ink-soft); font-size: 13.5px; font-style: italic; }
+main { max-width: 1000px; margin: 0 auto; padding: 12px 14px 60px; }
+table { border-collapse: collapse; width: 100%; }
+th {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 8px 8px 4px;
+  border-bottom: 2px solid var(--line-dark);
+}
+tr.ent { cursor: pointer; }
+tr.ent:nth-child(even) { background: var(--row-alt); }
+tr.ent:hover { background: #efe6cd; }
+tr.ent.open { background: #f7f0dd; }
+tr.ent td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.name { font-weight: 600; }
+td.name img { width: 30px; height: 30px; object-fit: cover; border: 1px solid var(--line-dark); border-radius: 3px; vertical-align: middle; margin-right: 9px; background: #2e2418; }
+td.who, td.type { color: var(--ink-soft); font-size: 14px; }
+tr.detail td {
+  background: #faf3df;
+  border: 1px solid var(--line-dark);
+  border-top: none;
+  padding: 10px 16px 12px;
+}
+.lvl { padding: 8px 0; border-top: 1px dotted var(--line); }
+.lvl:first-of-type { border-top: none; }
+.lvl .lname { font-weight: 600; font-size: 15.5px; }
+.lvl .lname .dim { font-weight: 400; }
+.lvl .lfx b, .anc .lfx b, .earn > b, .anti > b {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-right: 6px;
+}
+.lvl .ldesc { font-style: italic; color: var(--ink-soft); font-size: 14px; max-width: 70ch; margin-top: 1px; }
+.lvl .lfx { font-size: 14px; margin-top: 2px; }
+.anti { font-size: 14px; margin-top: 8px; }
+.earn { margin-top: 10px; font-size: 14px; }
+.earn ul { margin: 4px 0 0; padding-left: 20px; }
+.earn li { margin: 0 0 4px; max-width: 85ch; line-height: 1.45; }
+.earn .dim, .dim { color: var(--ink-soft); }
+.anc .adesc { font-style: italic; color: var(--ink-soft); max-width: 70ch; margin: 2px 0 6px; }
+.anc img.big { float: right; width: 64px; height: 64px; object-fit: cover; border: 1px solid var(--line-dark); border-radius: 3px; margin: 0 0 8px 12px; background: #2e2418; }
+.empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 40px 0; }
+.flash td { animation: flash 1.6s ease-out 1; }
+@keyframes flash { 0% { background: #e8d49a; } 100% { background: #faf3df; } }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  .hide-xs { display: none; }
+  main { padding: 8px 6px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Characters</h1>
+  <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a></nav>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search traits &amp; retinue&hellip;" autocomplete="off">
+  <span class="catbtns" id="grps">
+    <button data-grp="gen" class="active">Generals&rsquo; traits</button>
+    <button data-grp="agent">Agent traits</button>
+    <button data-grp="ret">Retinue</button>
+  </span>
+  <span class="count" id="count"></span>
+</div>
+
+<main>
+  <table>
+    <thead><tr id="thead"></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden>Nothing matches this search.</div>
+</main>
+
+<footer>Generated ${generated} from <code>export_descr_character_traits.txt</code> &amp; <code>export_descr_ancillaries.txt</code> &middot; ${model.characters.traits.length} traits &middot; ${model.characters.ancs.length} retinue members &amp; items &middot; trigger chances roll once per occasion</footer>
+
+<script>
+const TR = ${trJson};
+const AN = ${anJson};
+TR.forEach((t, i) => { t.id = 't' + i; t.kind = 't'; });
+AN.forEach((a, i) => { a.id = 'a' + i; a.kind = 'a'; });
+const state = { q: '', grp: 'gen', open: new Set() };
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function list() {
+  if (state.grp === 'ret') return AN;
+  return TR.filter(t => state.grp === 'agent' ? t.agent : !t.agent);
+}
+
+function matches(e) {
+  if (!state.q) return true;
+  const q = state.q.toLowerCase();
+  const hay = e.kind === 't'
+    ? e.name + ' ' + e.levels.map(l => l.name + ' ' + l.fx).join(' ') + ' ' + e.who
+    : e.name + ' ' + e.type + ' ' + e.fx;
+  return hay.toLowerCase().includes(q);
+}
+
+function rowHtml(e) {
+  const open = state.open.has(e.id) ? ' open' : '';
+  if (e.kind === 't') {
+    return '<tr class="ent' + open + '" data-id="' + e.id + '">' +
+      '<td class="name">' + esc(e.name) + '</td>' +
+      '<td class="who">' + (e.levels.length > 1 ? e.levels.length + ' levels' : '1 level') + '</td>' +
+      '<td class="who hide-xs">' + esc(e.who) + '</td></tr>';
+  }
+  const pic = e.img ? '<img loading="lazy" alt="" src="' + e.img + '">' : '';
+  return '<tr class="ent' + open + '" data-id="' + e.id + '">' +
+    '<td class="name">' + pic + esc(e.name) + '</td>' +
+    '<td class="type">' + esc(e.type) + '</td>' +
+    '<td class="type hide-xs">' + esc(e.fx) + '</td></tr>';
+}
+
+function earnHtml(earn) {
+  if (!earn.length) return '<div class="earn"><b>Earned by</b><span class="dim">No campaign triggers &mdash; granted by scripts or at game start.</span></div>';
+  const MAX = 12;
+  const items = earn.slice(0, MAX).map(t =>
+    '<li>' + (t.p ? '+' + t.p + (t.p === 1 ? ' point' : ' points') : '') +
+    (t.ch < 100 ? ' <span class="dim">(' + t.ch + '% chance)</span>' : '') +
+    ' ' + esc(t.w) + (t.c ? ' <span class="dim">if: ' + esc(t.c) + '</span>' : '') + '</li>').join('');
+  const more = earn.length > MAX ? '<li class="dim">&hellip;and ' + (earn.length - MAX) + ' more triggers</li>' : '';
+  return '<div class="earn"><b>Earned by</b><ul>' + items + more + '</ul></div>';
+}
+
+function detailHtml(e) {
+  if (e.kind === 't') {
+    const lvls = e.levels.map(l =>
+      '<div class="lvl"><div class="lname">' + esc(l.name) +
+      (l.thr ? ' <span class="dim">&mdash; at ' + l.thr + (l.thr === 1 ? ' point' : ' points') + '</span>' : '') + '</div>' +
+      (l.fx ? '<div class="lfx"><b>Effects</b>' + esc(l.fx) + '</div>' : '') +
+      (l.desc ? '<div class="ldesc">' + esc(l.desc) + '</div>' : '') +
+      '</div>').join('');
+    const anti = e.anti.length ? '<div class="anti"><b>Opposed by</b>' + esc(e.anti.join(', ')) + '</div>' : '';
+    return '<tr class="detail"><td colspan="3">' + lvls + anti + earnHtml(e.earn) + '</td></tr>';
+  }
+  const pic = e.img ? '<img class="big" alt="" src="' + e.img + '">' : '';
+  return '<tr class="detail"><td colspan="3"><div class="anc">' + pic +
+    (e.desc ? '<div class="adesc">' + esc(e.desc) + '</div>' : '') +
+    (e.fx ? '<div class="lfx"><b>Effects</b>' + esc(e.fx) + '</div>' : '') +
+    earnHtml(e.earn) + '</div></td></tr>';
+}
+
+function render() {
+  const items = list().filter(matches);
+  document.getElementById('thead').innerHTML = state.grp === 'ret'
+    ? '<th>Retinue</th><th>Type</th><th class="hide-xs">Effects</th>'
+    : '<th>Trait</th><th>Levels</th><th class="hide-xs">Applies to</th>';
+  let html = '';
+  for (const e of items) {
+    html += rowHtml(e);
+    if (state.open.has(e.id)) html += detailHtml(e);
+  }
+  document.getElementById('rows').innerHTML = html;
+  document.getElementById('empty').hidden = items.length > 0;
+  document.getElementById('count').textContent = items.length + ' of ' + list().length;
+}
+
+document.getElementById('q').addEventListener('input', (e) => { state.q = e.target.value.trim(); render(); });
+document.getElementById('grps').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  state.grp = btn.dataset.grp;
+  for (const x of document.querySelectorAll('#grps button')) x.classList.toggle('active', x === btn);
+  render();
+});
+document.getElementById('rows').addEventListener('click', (e) => {
+  const row = e.target.closest('tr.ent');
+  if (!row) return;
+  const id = row.dataset.id;
+  if (state.open.has(id)) { state.open.delete(id); setHash(''); }
+  else {
+    state.open.add(id);
+    const ent = (id[0] === 't' ? TR : AN).find(x => x.id === id);
+    setHash(ent.slug);
+  }
+  render();
+});
+document.getElementById('rows').addEventListener('error', (e) => {
+  if (e.target instanceof HTMLImageElement) e.target.remove();
+}, true);
+
+function setHash(slug) {
+  history.replaceState(null, '', slug ? '#' + slug : location.pathname + location.search);
+}
+function openFromHash() {
+  const slug = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (!slug) return;
+  const ent = TR.concat(AN).find(x => x.slug === slug);
+  if (!ent || state.open.has(ent.id)) return;
+  state.grp = ent.kind === 'a' ? 'ret' : ent.agent ? 'agent' : 'gen';
+  for (const x of document.querySelectorAll('#grps button')) x.classList.toggle('active', x.dataset.grp === state.grp);
+  state.q = '';
+  document.getElementById('q').value = '';
+  state.open.add(ent.id);
+  render();
+  const row = document.querySelector('tr.ent[data-id="' + ent.id + '"]');
+  if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
+}
+if (location.hash) history.scrollRestoration = 'manual';
+render();
+openFromHash();
+window.addEventListener('hashchange', openFromHash);
+</script>
+</body>
+</html>
+`;
+}
+
 // ---------------------------------------------------------------------- run
 
 const model = buildModel();
 fs.writeFileSync(OUT_HTML, buildHtml(model), 'utf8');
 fs.writeFileSync(OUT_BHTML, buildBuildingsHtml(model), 'utf8');
 fs.writeFileSync(OUT_FHTML, buildFactionsHtml(model), 'utf8');
+fs.writeFileSync(OUT_CHTML, buildCharactersHtml(model), 'utf8');
+console.log(`Characters page: ${model.characters.traits.length} traits, ${model.characters.ancs.length} retinue entries.`);
 
 // prune building pictures the model no longer references (default pics are
 // now culture-suffixed, orphaning the old unsuffixed exports)
@@ -3448,7 +3985,7 @@ console.log(`${model.recruitable} units have building recruitment data; ${model.
 if (model.missingNames) console.log(`${model.missingNames} units had no entry in export_units.txt (internal name used).`);
 if (model.missingCards) console.log(`${model.missingCards} units had no card image in data/ui/units/mercs.`);
 if (model.missingPortraits) console.log(`${model.missingPortraits} units had no portrait in data/ui/unit_info/merc.`);
-for (const [dir, label] of [[OUT_PORTRAITS, 'portraits/'], [OUT_CARDS, 'cards/'], [OUT_BPICS, 'buildingpics/']]) {
+for (const [dir, label] of [[OUT_PORTRAITS, 'portraits/'], [OUT_CARDS, 'cards/'], [OUT_BPICS, 'buildingpics/'], [OUT_APICS, 'ancpics/']]) {
   if (!fs.existsSync(dir)) continue;
   const pics = fs.readdirSync(dir).filter((f) => f.endsWith('.png'));
   const mb = pics.reduce((s, f) => s + fs.statSync(path.join(dir, f)).size, 0) / 1048576;
