@@ -534,25 +534,32 @@ function parseEdb(file) {
   return { byUnit, chains };
 }
 
-// eopData guild scripts: how guild points are earned. guildData.lua holds
-// modder-written "influenceActions" descriptions plus faction ownership via
-// F_* constants, which factionData.lua resolves to vanilla faction tags.
-function parseGuildTriggers() {
+// The eopData scripts refer to factions through F_* constants; factionData.lua
+// resolves them to the vanilla tags the mod is built on (F_HIGHELVES -> saxons).
+function parseFactionConsts() {
   const facFile = path.join(EOP_SCRIPTS, 'Campaign', 'factionData.lua');
-  const guildFile = path.join(EOP_SCRIPTS, 'Campaign', 'Guilds', 'guildData.lua');
-  const byChain = {};
-  if (!fs.existsSync(facFile) || !fs.existsSync(guildFile)) return byChain;
+  const map = {};
+  if (!fs.existsSync(facFile)) return map;
   const facLua = fs.readFileSync(facFile, 'utf8');
-  // f_highelves -> "saxons"
-  const keyToTag = {};
+  const keyToTag = {}; // f_highelves -> "saxons"
   for (const m of facLua.matchAll(/(f_\w+)\s*=\s*factionData:new\s*\{[\s\S]*?name\s*=\s*"(\w+)"/g)) {
     keyToTag[m[1]] = m[2];
   }
-  // F_HIGHELVES -> f_highelves
-  const constToKey = {};
+  // F_HIGHELVES -> f_highelves -> saxons
   for (const m of facLua.matchAll(/(F_\w+)\s*=\s*FACTION\.data\.(f_\w+)/g)) {
-    constToKey[m[1]] = m[2];
+    if (keyToTag[m[2]]) map[m[1]] = keyToTag[m[2]];
   }
+  return map;
+}
+
+// eopData guild scripts: how guild points are earned. guildData.lua holds
+// modder-written "influenceActions" descriptions plus faction ownership via
+// F_* constants.
+function parseGuildTriggers() {
+  const guildFile = path.join(EOP_SCRIPTS, 'Campaign', 'Guilds', 'guildData.lua');
+  const byChain = {};
+  if (!fs.existsSync(guildFile)) return byChain;
+  const consts = parseFactionConsts();
   const lua = fs.readFileSync(guildFile, 'utf8');
   const starts = [...lua.matchAll(/\w+\s*=\s*guildData:new\s*\{/g)];
   for (let i = 0; i < starts.length; i++) {
@@ -562,7 +569,7 @@ function parseGuildTriggers() {
     const how = [...((seg.match(/influenceActions\s*=\s*\{([\s\S]*?)\}/) || [])[1] || '').matchAll(/"([^"]*)"/g)]
       .map((m) => m[1].replace(/^\s*-\s*/, '').trim()).filter(Boolean);
     const facTags = [...((seg.match(/factionOwnership\s*=\s*\{([\s\S]*?)\}/) || [])[1] || '').matchAll(/(F_\w+)\.name/g)]
-      .map((m) => keyToTag[constToKey[m[1]]]).filter(Boolean);
+      .map((m) => consts[m[1]]).filter(Boolean);
     byChain[chain] = {
       gname: (seg.match(/displayName\s*=\s*"([^"]+)"/) || [])[1] || '',
       how,
@@ -570,6 +577,35 @@ function parseGuildTriggers() {
     };
   }
   return byChain;
+}
+
+// Campaign/factionOverviews.lua: the in-game per-faction overview of
+// questlines and campaign scripts — uniform { title, descr } entries keyed by
+// F_* constants. descr is either a quoted string or a [[long string]].
+function parseFactionOverviews() {
+  const file = path.join(EOP_SCRIPTS, 'Campaign', 'factionOverviews.lua');
+  const byTag = {};
+  if (!fs.existsSync(file)) return byTag;
+  const consts = parseFactionConsts();
+  const lua = fs.readFileSync(file, 'utf8');
+  const starts = [...lua.matchAll(/\[(F_\w+)\.name\]\s*=\s*\{/g)];
+  for (let i = 0; i < starts.length; i++) {
+    const tag = consts[starts[i][1]];
+    const end = i + 1 < starts.length ? starts[i + 1].index : lua.search(/\n\}/);
+    const seg = lua.slice(starts[i].index, end);
+    if (!tag) continue;
+    const quests = [];
+    const re = /title\s*=\s*"((?:[^"\\]|\\.)*)"\s*,\s*descr\s*=\s*(?:"((?:[^"\\]|\\.)*)"|\[\[([\s\S]*?)\]\])/g;
+    for (const m of seg.matchAll(re)) {
+      const title = m[1].trim();
+      if (/^this faction has no important/i.test(title)) continue;
+      const descr = (m[2] !== undefined ? m[2] : m[3] || '')
+        .replace(/\r/g, '').replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+      quests.push({ t: title, d: descr });
+    }
+    if (quests.length) byTag[tag] = quests;
+  }
+  return byTag;
 }
 
 // eopData factionData.lua: per-faction side (good/evil), curated unit tiers
@@ -637,6 +673,7 @@ function smithingSummary(chains, ownerMap, guilds, cultures) {
 function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, guilds, cultures) {
   const smithing = smithingSummary(chains, ownerMap, guilds, cultures);
   const chainBySlug = new Map(buildings.map((b) => [b.slug, b]));
+  const overviews = parseFactionOverviews();
   const cdesc = parseExportUnits(CAMPAIGN_DESCR_TXT);
   const facLua = parseFactionLua();
   const sectionOrder = [...new Set(units.map((u) => u.faction))];
@@ -692,6 +729,7 @@ function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, gui
         cname: smLvl ? (smLvl.names[section] || smLvl.name) : '',
       },
       low: linkify(lua.low), mid: linkify(lua.mid), high: linkify(lua.high),
+      quests: overviews[tag] || [],
       descr,
     });
   }
@@ -3094,6 +3132,10 @@ h2.side.evil { color: var(--bad); }
 }
 .fbody p { margin: 0 0 8px; max-width: 80ch; text-align: justify; hyphens: auto; }
 .fbody .quote { font-style: italic; color: var(--ink-soft); }
+.fbody .quests { border-top: 1px dotted var(--line); margin-top: 14px; padding-top: 2px; }
+.fbody .quest { margin: 0 0 12px; }
+.fbody .quest b { color: var(--accent); display: block; margin-bottom: 2px; }
+.fbody .quest p { margin: 2px 0 6px; max-width: 95ch; }
 .fbody a.unitlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); cursor: pointer; }
 .fbody a.unitlink:hover { background: rgba(122,31,31,.08); }
 .fbody .roster {
@@ -3165,6 +3207,16 @@ function descrHtml(f) {
   }).join('');
 }
 
+// Questlines and campaign scripts, from the in-game faction overview
+// (factionOverviews.lua). Long entries keep their paragraphs and line breaks.
+function questsHtml(f) {
+  if (!f.quests.length) return '';
+  return '<div class="quests"><h3>Questlines &amp; campaign scripts (' + f.quests.length + ')</h3>' +
+    f.quests.map(q => '<div class="quest"><b>' + esc(q.t) + '</b>' +
+      q.d.split(/\\n{2,}/).map(p => '<p>' + esc(p).replace(/\\n/g, '<br>') + '</p>').join('') +
+      '</div>').join('') + '</div>';
+}
+
 // Factions differ in how far their smiths can upgrade unit armour; events can
 // unlock levels beyond the everyday maximum.
 function smithHtml(f) {
@@ -3202,7 +3254,7 @@ function cardHtml(f) {
       (f.mid.length ? '<h3>Mid-tier units</h3><p>' + tierLine(f.mid) + '</p>' : '') +
       (f.high.length ? '<h3>Elite units</h3><p>' + tierLine(f.high) + '</p>' : '') +
       '<a class="roster" href="index.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
-      '</div></div></div>';
+      '</div></div>' + questsHtml(f) + '</div>';
   }
   return '<div class="fcard' + (open.has(f.id) ? ' open' : '') + '" data-id="' + f.id + '">' +
     '<div class="fhead">' +

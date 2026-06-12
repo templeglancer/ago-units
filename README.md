@@ -128,3 +128,7 @@ needed beyond Node.
   (factions differ widely: level 3 for Rohan, level 7 for the dwarven realms)
   with event-unlocked levels noted separately, linking to the smith chain on
   the buildings page
+- Questlines & campaign scripts: every faction card lists its unique quests
+  and scripted features (95 across the 26 factions, from the in-game faction
+  overview in `eopData/.../factionOverviews.lua`) — triggers, choices and
+  rewards as written by the mod team
