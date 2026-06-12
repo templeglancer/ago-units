@@ -1612,6 +1612,100 @@ function parseAncillaries(file) {
   return { ancs, triggers };
 }
 
+// eopData nazgul.lua: the Nine — names, dread, traits, relics, bodyguard
+// unit, battle ability and the shared respawn rule.
+function parseNazgul(ownerMap) {
+  const file = path.join(EOP_SCRIPTS, 'Campaign', 'nazgul.lua');
+  const out = [];
+  if (!fs.existsSync(file)) return out;
+  const lua = fs.readFileSync(file, 'utf8');
+  const respawn = Number((lua.match(/RESPAWN_TIME\s*=\s*(\d+)/) || [])[1] || 0);
+  for (const seg of lua.split(/nazgulData:new\s*\{/).slice(1)) {
+    const g = (re) => (seg.match(re) || [])[1];
+    const localName = g(/localName\s*=\s*"([^"]+)"/);
+    if (!localName) continue;
+    let traits = [...(g(/traits\s*=\s*\{([\s\S]*?)\}/) || '').matchAll(/(\w+)\s*=\s*(\d+)/g)]
+      .map((m) => ({ n: m[1], v: Number(m[2]) }));
+    // entries without an explicit list use the class defaults
+    if (!traits.length) {
+      traits = [{ n: 'BattleFear', v: 2 }, { n: 'GoodCommander', v: 2 }, { n: 'GoodAttacker', v: 1 }];
+    }
+    out.push({
+      n: localName,
+      idx: Number(g(/index\s*=\s*(\d+)/) || 0),
+      dread: Number(g(/dread\s*=\s*(-?\d+)/) || 0),
+      owner: ownerMap[g(/ownerFaction\s*=\s*"(\w+)"/) || 'england'] || 'Mordor',
+      ability: (g(/ability\s*=\s*"([^"]+)"/) || '').replace(/_/g, ' '),
+      unit: g(/unit\s*=\s*"([^"]+)"/) || '',
+      traits,
+      ancs: [...(g(/ancillaries\s*=\s*\{([\s\S]*?)\}/) || '').matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+      respawn,
+    });
+  }
+  return out.sort((a, b) => a.idx - b.idx);
+}
+
+// Scripted battle abilities: descr_hero_abilities.xml holds the battlefield
+// effect (duration, uses, what it does to whom); heroAbilities.lua holds who
+// can earn it (trait, buildings, cultures, chance).
+function parseHeroAbilities(ownerMap, cultures) {
+  const xmlFile = path.join(MOD_ROOT, 'data', 'descr_hero_abilities.xml');
+  const luaFile = path.join(EOP_SCRIPTS, 'Campaign', 'heroAbilities.lua');
+  const cultureFacs = {};
+  for (const [t, c] of Object.entries(cultures)) {
+    if (ownerMap[t]) (cultureFacs[c] = cultureFacs[c] || []).push(ownerMap[t]);
+  }
+  const xmlBy = {};
+  if (fs.existsSync(xmlFile)) {
+    for (const seg of fs.readFileSync(xmlFile, 'latin1').split(/<hero_ability>/).slice(1)) {
+      const g = (re) => (seg.match(re) || [])[1];
+      const name = g(/<name>([^<]+)<\/name>/);
+      if (!name || name === 'Sample_Ability') continue;
+      const effects = [...seg.matchAll(/<hero_ability_effect>([\s\S]*?)<\/hero_ability_effect>/g)].map((m) => {
+        const e = (re) => (m[1].match(re) || [])[1] || '';
+        return {
+          n: e(/<name>([^<]+)/).replace(/_/g, ' '),
+          t: e(/<target>([^<]+)/).replace(/_/g, ' '),
+          v: e(/<value>(-?[\d.]+)/) || e(/<factor>([\d.]+)/) || e(/<morale_level>([^<]+)/),
+        };
+      });
+      xmlBy[name] = {
+        dur: Number(g(/<duration>(\d+)/) || 0),
+        act: Number(g(/<activations>(\d+)/) || 1),
+        cd: Number(g(/<cooldown>(\d+)/) || 0),
+        effects,
+      };
+    }
+  }
+  const out = [];
+  const seenKeys = new Set();
+  if (fs.existsSync(luaFile)) {
+    for (const seg of fs.readFileSync(luaFile, 'utf8').split(/heroAbilityTrigger:new\s*\{/).slice(1)) {
+      const g = (re) => (seg.match(re) || [])[1];
+      const name = g(/name\s*=\s*"([^"]+)"/);
+      if (!name) continue;
+      seenKeys.add(name);
+      out.push({
+        n: g(/localizedName\s*=\s*"([^"]+)"/) || camelWords(name),
+        chance: Number(g(/chance\s*=\s*(\d+)/) || 5), // lua class default
+        reqTrait: g(/requiredTrait\s*=\s*"(\w+)"/) || '',
+        reqBld: [...(g(/requiredBuildings\s*=\s*\{([\s\S]*?)\}/) || '').matchAll(/"([^"]+)"/g)]
+          .map((m) => m[1].replace(/_/g, ' ')),
+        facs: [...new Set([...(g(/requiredCultures\s*=\s*\{([\s\S]*?)\}/) || '').matchAll(/"([^"]+)"/g)]
+          .flatMap((m) => cultureFacs[m[1]] || []))],
+        xml: xmlBy[name] || null,
+      });
+    }
+  }
+  // abilities defined only in the XML are granted directly to named heroes
+  for (const [name, x] of Object.entries(xmlBy)) {
+    if (!seenKeys.has(name)) {
+      out.push({ n: camelWords(name).replace(/_/g, ' '), chance: 0, reqTrait: '', reqBld: [], facs: [], xml: x, fixed: true });
+    }
+  }
+  return out.sort((a, b) => a.n.localeCompare(b.n));
+}
+
 const WHEN_LABELS = {
   PostBattle: 'after a battle',
   CharacterTurnEnd: 'at turn end',
@@ -1629,7 +1723,7 @@ const WHEN_LABELS = {
 };
 const camelWords = (x) => x.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
 
-function buildCharacters(ownerMap) {
+function buildCharacters(ownerMap, cultures, unitsByType) {
   const vnv = parseExportUnits(VNVS_TXT);
   const atxt = parseExportUnits(ANC_TEXT_TXT);
   const td = parseTraits(TRAITS_TXT);
@@ -1685,6 +1779,7 @@ function buildCharacters(ownerMap) {
   }));
   const displayOf = {};
   for (const r of resolved) if (r.levels.length) displayOf[r.tr.name] = r.levels[0].name;
+  const traitSlug = {}; // internal trait name -> page slug, for cross-links
   const traits = [];
   for (const r of resolved) {
     const tr = r.tr;
@@ -1693,7 +1788,7 @@ function buildCharacters(ownerMap) {
       : tr.who.trim() === 'all' ? 'All characters'
       : tr.who.split(',').map((x) => x.trim()).map((x) => x[0].toUpperCase() + x.slice(1)).join(', ');
     traits.push({
-      slug: slug('t-' + tr.name),
+      slug: (traitSlug[tr.name] = slug('t-' + tr.name)),
       name: r.levels[0].name,
       who,
       agent: !/family/.test(tr.who),
@@ -1711,13 +1806,16 @@ function buildCharacters(ownerMap) {
     follower: 'Follower', item: 'Item', weapon_primary: 'Weapon', armour: 'Armour',
     king: 'King', court: 'Court', spy_network: 'Spy network', NextHeir: 'Heirloom',
   };
+  const ancRef = {}; // internal ancillary name -> { name, slug }
   const ancs = [];
   for (const a of ad.ancs) {
     const name = cleanText(atxt[a.name.toLowerCase()] || '');
     if (!name || /^(hidden|biography)$/i.test(name)) continue;
     const tga = a.image && imgIndex[a.image.toLowerCase()];
+    const s = slug('a-' + a.name);
+    ancRef[a.name] = { name, slug: s };
     ancs.push({
-      slug: slug('a-' + a.name),
+      slug: s,
       name,
       type: TYPE_LABELS[a.type] || camelWords((a.type || '').replace(/^./, (c) => c.toUpperCase())),
       img: tga ? exportImage(tga, 'anc_' + a.name, OUT_APICS, 'ancpics') : '',
@@ -1728,7 +1826,23 @@ function buildCharacters(ownerMap) {
   }
   traits.sort((a, b) => a.name.localeCompare(b.name));
   ancs.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
-  return { traits, ancs };
+  // the Nine and the scripted battle abilities, cross-linked to the traits
+  // and relics above and to the unit page
+  const nazgul = parseNazgul(ownerMap).map((nz) => ({
+    slug: slug('h-' + nz.n),
+    kind: 'n',
+    ...nz,
+    traits: nz.traits.map((t) => ({ n: displayOf[t.n] || camelWords(t.n), s: traitSlug[t.n] || '', v: t.v })),
+    ancs: nz.ancs.map((a) => ancRef[a] || { name: camelWords(a).replace(/_/g, ' '), slug: '' }),
+    unitRef: nz.unit ? (unitsByType[nz.unit.toLowerCase()] || { name: nz.unit, slug: '' }) : null,
+  }));
+  const abilities = parseHeroAbilities(ownerMap, cultures).map((ab) => ({
+    slug: slug('h-' + ab.n),
+    kind: 'b',
+    ...ab,
+    reqTraitRef: ab.reqTrait ? { n: displayOf[ab.reqTrait] || camelWords(ab.reqTrait), s: traitSlug[ab.reqTrait] || '' } : null,
+  }));
+  return { traits, ancs, nazgul, abilities };
 }
 
 // --------------------------------------------------------------- EOP units
@@ -2009,7 +2123,7 @@ function buildModel() {
   }
 
   const factionPages = buildFactionsModel(units, ownerMap, unitsByType, edbChains, buildings, guilds, cultures);
-  const characters = buildCharacters(ownerMap);
+  const characters = buildCharacters(ownerMap, cultures, unitsByType);
   const world = buildWorld(ownerMap, unitsByType);
 
   return {
@@ -4011,6 +4125,7 @@ if (location.hash) {
 function buildCharactersHtml(model) {
   const trJson = JSON.stringify(model.characters.traits);
   const anJson = JSON.stringify(model.characters.ancs);
+  const heJson = JSON.stringify([...model.characters.nazgul, ...model.characters.abilities]);
   const generated = new Date().toISOString().slice(0, 10);
 
   return `<!DOCTYPE html>
@@ -4148,6 +4263,8 @@ tr.detail td {
 .earn .dim, .dim { color: var(--ink-soft); }
 .anc .adesc { font-style: italic; color: var(--ink-soft); max-width: 70ch; margin: 2px 0 6px; }
 .anc img.big { float: right; width: 64px; height: 64px; object-fit: cover; border: 1px solid var(--line-dark); border-radius: 3px; margin: 0 0 8px 12px; background: #2e2418; }
+a.unitlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+a.unitlink:hover { background: rgba(122,31,31,.08); }
 .empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 40px 0; }
 .flash td { animation: flash 1.6s ease-out 1; }
 @keyframes flash { 0% { background: #e8d49a; } 100% { background: #faf3df; } }
@@ -4180,6 +4297,7 @@ footer {
     <button data-grp="gen" class="active">Generals&rsquo; traits</button>
     <button data-grp="agent">Agent traits</button>
     <button data-grp="ret">Retinue</button>
+    <button data-grp="hero">Heroes &amp; powers</button>
   </span>
   <span class="count" id="count"></span>
 </div>
@@ -4197,8 +4315,10 @@ footer {
 <script>
 const TR = ${trJson};
 const AN = ${anJson};
+const HE = ${heJson};
 TR.forEach((t, i) => { t.id = 't' + i; t.kind = 't'; });
 AN.forEach((a, i) => { a.id = 'a' + i; a.kind = 'a'; });
+HE.forEach((h, i) => { h.id = 'h' + i; });
 const state = { q: '', grp: 'gen', open: new Set() };
 
 function esc(s) {
@@ -4207,6 +4327,7 @@ function esc(s) {
 
 function list() {
   if (state.grp === 'ret') return AN;
+  if (state.grp === 'hero') return HE;
   return TR.filter(t => state.grp === 'agent' ? t.agent : !t.agent);
 }
 
@@ -4215,7 +4336,9 @@ function matches(e) {
   const q = state.q.toLowerCase();
   const hay = e.kind === 't'
     ? e.name + ' ' + e.levels.map(l => l.name + ' ' + l.fx).join(' ') + ' ' + e.who
-    : e.name + ' ' + e.type + ' ' + e.fx;
+    : e.kind === 'a' ? e.name + ' ' + e.type + ' ' + e.fx
+    : e.kind === 'n' ? e.n + ' ' + e.owner + ' ' + e.ability
+    : e.n + ' ' + e.facs.join(' ') + ' ' + (e.reqTraitRef ? e.reqTraitRef.n : '');
   return hay.toLowerCase().includes(q);
 }
 
@@ -4227,11 +4350,59 @@ function rowHtml(e) {
       '<td class="who">' + (e.levels.length > 1 ? e.levels.length + ' levels' : '1 level') + '</td>' +
       '<td class="who hide-xs">' + esc(e.who) + '</td></tr>';
   }
+  if (e.kind === 'n') {
+    return '<tr class="ent' + open + '" data-id="' + e.id + '">' +
+      '<td class="name">' + esc(e.n) + '</td>' +
+      '<td class="who">Nazg&ucirc;l</td>' +
+      '<td class="who hide-xs">' + esc(e.owner) + '</td></tr>';
+  }
+  if (e.kind === 'b') {
+    const who = e.fixed ? 'named heroes' : (e.facs.length ? e.facs.join(', ') : 'any general');
+    return '<tr class="ent' + open + '" data-id="' + e.id + '">' +
+      '<td class="name">' + esc(e.n) + '</td>' +
+      '<td class="who">Battle ability</td>' +
+      '<td class="who hide-xs">' + esc(who) + '</td></tr>';
+  }
   const pic = e.img ? '<img loading="lazy" alt="" src="' + e.img + '">' : '';
   return '<tr class="ent' + open + '" data-id="' + e.id + '">' +
     '<td class="name">' + pic + esc(e.name) + '</td>' +
     '<td class="type">' + esc(e.type) + '</td>' +
     '<td class="type hide-xs">' + esc(e.fx) + '</td></tr>';
+}
+
+function clink(ref) {
+  return ref.s || ref.slug
+    ? '<a class="unitlink" href="#' + (ref.s || ref.slug) + '">' + esc(ref.n || ref.name) + '</a>'
+    : esc(ref.n || ref.name);
+}
+
+function heroDetail(e) {
+  const parts = [];
+  if (e.kind === 'n') {
+    parts.push('<div class="lfx"><b>Dread</b>' + e.dread + ' (terrifies nearby foes)</div>');
+    if (e.ability) parts.push('<div class="lfx"><b>Battle ability</b>' + esc(e.ability) + '</div>');
+    if (e.unitRef) parts.push('<div class="lfx"><b>Bodyguard</b>' +
+      (e.unitRef.slug ? '<a class="unitlink" href="index.html#' + e.unitRef.slug + '">' + esc(e.unitRef.name) + '</a>' : esc(e.unitRef.name)) + '</div>');
+    if (e.traits.length) parts.push('<div class="lfx"><b>Traits</b>' + e.traits.map(t => clink(t) + ' <span class="dim">' + t.v + '</span>').join(', ') + '</div>');
+    if (e.ancs.length) parts.push('<div class="lfx"><b>Relics</b>' + e.ancs.map(clink).join(', ') + '</div>');
+    if (e.respawn) parts.push('<div class="lfx"><b>Death</b>returns after ' + e.respawn + ' turns unless the One Ring is destroyed</div>');
+  } else {
+    if (e.xml) {
+      const x = e.xml;
+      const fx = x.effects.map(f => esc(f.n) + ' <span class="dim">(' + esc(f.t) + (f.v ? ', ' + esc(f.v) : '') + ')</span>').join(', ');
+      if (fx) parts.push('<div class="lfx"><b>Effects</b>' + fx + '</div>');
+      parts.push('<div class="lfx"><b>Use</b>' + (x.dur ? x.dur + 's duration' : 'instant') +
+        ' &middot; ' + x.act + (x.act === 1 ? ' use' : ' uses') + (x.cd ? ' &middot; ' + x.cd + 's cooldown' : '') + '</div>');
+    }
+    const req = [];
+    if (e.reqTraitRef) req.push('trait ' + clink(e.reqTraitRef));
+    if (e.reqBld.length) req.push('building: ' + esc(e.reqBld.join(', ')));
+    if (e.facs.length) req.push('factions: ' + esc(e.facs.join(', ')));
+    if (e.chance) req.push(e.chance + '% chance per qualifying turn');
+    if (e.fixed) req.push('granted directly to specific named heroes');
+    if (req.length) parts.push('<div class="lfx"><b>Earned by</b>' + req.join(' &middot; ') + '</div>');
+  }
+  return '<tr class="detail"><td colspan="3">' + parts.join('') + '</td></tr>';
 }
 
 function earnHtml(earn) {
@@ -4246,6 +4417,7 @@ function earnHtml(earn) {
 }
 
 function detailHtml(e) {
+  if (e.kind === 'n' || e.kind === 'b') return heroDetail(e);
   if (e.kind === 't') {
     const lvls = e.levels.map(l =>
       '<div class="lvl"><div class="lname">' + esc(l.name) +
@@ -4267,6 +4439,8 @@ function render() {
   const items = list().filter(matches);
   document.getElementById('thead').innerHTML = state.grp === 'ret'
     ? '<th>Retinue</th><th>Type</th><th class="hide-xs">Effects</th>'
+    : state.grp === 'hero'
+    ? '<th>Name</th><th>Kind</th><th class="hide-xs">Belongs to</th>'
     : '<th>Trait</th><th>Levels</th><th class="hide-xs">Applies to</th>';
   let html = '';
   for (const e of items) {
@@ -4293,7 +4467,7 @@ document.getElementById('rows').addEventListener('click', (e) => {
   if (state.open.has(id)) { state.open.delete(id); setHash(''); }
   else {
     state.open.add(id);
-    const ent = (id[0] === 't' ? TR : AN).find(x => x.id === id);
+    const ent = (id[0] === 't' ? TR : id[0] === 'h' ? HE : AN).find(x => x.id === id);
     setHash(ent.slug);
   }
   render();
@@ -4308,9 +4482,9 @@ function setHash(slug) {
 function openFromHash() {
   const slug = decodeURIComponent(location.hash.replace(/^#/, ''));
   if (!slug) return;
-  const ent = TR.concat(AN).find(x => x.slug === slug);
+  const ent = TR.concat(AN, HE).find(x => x.slug === slug);
   if (!ent || state.open.has(ent.id)) return;
-  state.grp = ent.kind === 'a' ? 'ret' : ent.agent ? 'agent' : 'gen';
+  state.grp = ent.kind === 'a' ? 'ret' : (ent.kind === 'n' || ent.kind === 'b') ? 'hero' : ent.agent ? 'agent' : 'gen';
   for (const x of document.querySelectorAll('#grps button')) x.classList.toggle('active', x.dataset.grp === state.grp);
   state.q = '';
   document.getElementById('q').value = '';

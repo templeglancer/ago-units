@@ -8,7 +8,9 @@ pages: **buildings.html** (every building chain and guild, with a settlement
 tech-tree view), **factions.html** (campaign overviews and questlines for all
 26 playable factions), **characters.html** (every visible character trait
 with its level thresholds, effects and earning triggers, plus the full
-retinue of followers and items) and **regions.html** (the world atlas: all
+retinue of followers and items, and a Heroes & powers group: the Nine
+Nazgul with dread, traits, relics, bodyguards and respawn rules, plus all
+scripted battle abilities with effects and earning requirements) and **regions.html** (the world atlas: all
 198 provinces with starting owner, settlement type and population, religion
 mix, regional traits, scripted garrisons and local rebel forces, plus the
 minor settlements and scripted landmarks).
