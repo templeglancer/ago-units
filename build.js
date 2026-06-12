@@ -675,12 +675,92 @@ function smithingSummary(chains, ownerMap, guilds, cultures) {
   return out;
 }
 
+// Faction_Scripts lore: the questline scrolls (F_STRING long texts with title
+// and quote) and historic-event popups each faction's campaign scripts show
+// in game — the announcements of quest triggers and rewards. Only the files
+// agoV3.lua actually requires are read (the tree holds dead older copies).
+function parseFactionLore() {
+  const loaderFile = path.join(EOP_SCRIPTS, 'agoV3.lua');
+  const byTag = {};
+  if (!fs.existsSync(loaderFile)) return byTag;
+  const consts = parseFactionConsts();
+  // first path segment under Faction_Scripts -> owning faction constant(s);
+  // the Elves scripts serve all three elven factions
+  const OWNERS = {
+    dunland: ['F_DUNLAND'], dorwinion: ['F_DORWINION'], anduin: ['F_ANDUIN'],
+    goblins: ['F_GOBLINS'], rohan: ['F_ROHAN'], harad: ['F_HARAD'],
+    dunedain: ['F_RANGERS'], rhun: ['F_RHUN'], mordor: ['F_MORDOR'],
+    gondor: ['F_GONDOR'], bree: ['F_BREE'], isengard: ['F_ISENGARD'],
+    elves: ['F_HIGHELVES', 'F_LORIEN', 'F_WOODLAND'],
+    highelves: ['F_HIGHELVES'], adunaim: ['F_ADUNAIM'], lorien: ['F_LORIEN'],
+    woodland: ['F_WOODLAND'], angmar: ['F_ANGMAR'], dale: ['F_DALE'],
+    khazad: ['F_KHAZAD'],
+  };
+  const seenByTag = {};
+  const loader = fs.readFileSync(loaderFile, 'utf8');
+  for (const r of loader.matchAll(/require\("(Faction_Scripts\/[^"]+)"\)/g)) {
+    const key = r[1].split('/')[1].replace(/\.lua$/i, '').toLowerCase();
+    const owners = OWNERS[key];
+    const file = path.join(EOP_SCRIPTS, r[1] + '.lua');
+    if (!owners || !fs.existsSync(file)) continue;
+    const lua = fs.readFileSync(file, 'utf8');
+    const entries = [];
+    // scroll tables come in several field orders (title/text, text/title with
+    // a chance field between, title/message stage pairs), so scan all such
+    // fields in sequence and pair a title with the text adjacent to it
+    const fieldRe = /\b(title|text|message|quote|quoteAuthor)\s*=\s*(?:F_STRING\(\[\[([\s\S]*?)\]\]\)|\s*"((?:[^"\\]|\\.)*)")/g;
+    let pend = null;
+    let lastE = null;
+    for (const m of lua.matchAll(fieldRe)) {
+      const field = m[1];
+      const val = (m[2] !== undefined ? m[2] : m[3] || '').replace(/\\n/g, '\n').trim();
+      const start = m.index;
+      const end = m.index + m[0].length;
+      const near = (p) => p && start - p.end < 260;
+      if (field === 'title') {
+        if (near(pend) && pend.f === 'd') { entries.push(lastE = { t: val, d: pend.v, q: '', a: '', end }); pend = null; }
+        else pend = { f: 't', v: val, end };
+      } else if (field === 'text' || field === 'message') {
+        if (near(pend) && pend.f === 't') { entries.push(lastE = { t: pend.v, d: val, q: '', a: '', end }); pend = null; }
+        else pend = { f: 'd', v: val, end };
+      } else if (field === 'quote' && near(lastE)) { lastE.q = val; lastE.end = end; }
+      else if (field === 'quoteAuthor' && near(lastE)) { lastE.a = val.replace(/^-\s*/, ''); lastE.end = end; }
+    }
+    // popup calls: the key may be a variable and the body may be wrapped in
+    // stringFormat(...) with {1}-style placeholders (a character's name)
+    const evRe = /historicEvent\(\s*[^,()]+,\s*"((?:[^"\\]|\\.)*)"\s*,\s*(?:stringFormat\(\s*)?"((?:[^"\\]|\\.)*)"/g;
+    for (const m of lua.matchAll(evRe)) {
+      const lineStart = lua.lastIndexOf('\n', m.index) + 1;
+      if (lua.slice(lineStart, m.index).includes('--')) continue; // commented out
+      entries.push({
+        t: m[1].trim(),
+        d: m[2].replace(/\\n/g, '\n').replace(/\{\d+\}/g, '…'),
+        q: '', a: '',
+      });
+    }
+    for (const e of entries) {
+      e.d = e.d.replace(/\r/g, '').trim();
+      if (!e.t || !e.d) continue;
+      for (const fc of owners) {
+        const tag = consts[fc];
+        if (!tag) continue;
+        const seen = (seenByTag[tag] = seenByTag[tag] || new Map());
+        const prev = seen.get(e.t); // player/AI variants repeat titles: keep the fullest
+        if (!prev || prev.d.length < e.d.length) seen.set(e.t, e);
+      }
+    }
+  }
+  for (const [tag, m] of Object.entries(seenByTag)) byTag[tag] = [...m.values()];
+  return byTag;
+}
+
 // Faction overview model: campaign_descriptions.txt blurbs + factionData.lua
 // tiers + roster counts from the unit model.
 function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, guilds, cultures) {
   const smithing = smithingSummary(chains, ownerMap, guilds, cultures);
   const chainBySlug = new Map(buildings.map((b) => [b.slug, b]));
   const overviews = parseFactionOverviews();
+  const loreByTag = parseFactionLore();
   const cdesc = parseExportUnits(CAMPAIGN_DESCR_TXT);
   const facLua = parseFactionLua();
   const sectionOrder = [...new Set(units.map((u) => u.faction))];
@@ -737,6 +817,7 @@ function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, gui
       },
       low: linkify(lua.low), mid: linkify(lua.mid), high: linkify(lua.high),
       quests: overviews[tag] || [],
+      lore: loreByTag[tag] || [],
       descr,
     });
   }
@@ -3494,6 +3575,29 @@ function questsHtml(f) {
     }).join('') + '</div>';
 }
 
+// In-game scrolls and event popups from the faction's campaign scripts — the
+// announcements of quest triggers and rewards, in the same index style.
+function loreHtml(f) {
+  if (!f.lore.length) return '';
+  return '<div class="quests"><h3>Chronicles &amp; events (' + f.lore.length + ')</h3>' +
+    f.lore.map((q, i) => {
+      const key = 'l:' + f.slug + ':' + i;
+      const isOpen = qopen.has(key);
+      return '<div class="quest' + (isOpen ? ' qopen' : '') + '">' +
+        '<button class="qrow" data-q="' + key + '" aria-expanded="' + isOpen + '">' +
+          '<span class="qmark">&#10070;</span>' +
+          '<span class="qtitle">' + esc(q.t) + '</span>' +
+          '<span class="qleader"></span>' +
+          '<span class="qtoggle">' + (isOpen ? '&minus;' : '+') + '</span>' +
+        '</button>' +
+        (isOpen ? '<div class="qbody">' +
+          q.d.split(/\\n{2,}/).map(p => '<p>' + esc(p).replace(/\\n/g, '<br>') + '</p>').join('') +
+          (q.q ? '<p class="quote">' + esc(q.q) + (q.a ? ' <span class="dim">' + esc(q.a) + '</span>' : '') + '</p>' : '') +
+        '</div>' : '') +
+      '</div>';
+    }).join('') + '</div>';
+}
+
 // Factions differ in how far their smiths can upgrade unit armour; events can
 // unlock levels beyond the everyday maximum.
 function smithHtml(f) {
@@ -3531,7 +3635,7 @@ function cardHtml(f) {
       (f.mid.length ? '<h3>Mid-tier units</h3><p>' + tierLine(f.mid) + '</p>' : '') +
       (f.high.length ? '<h3>Elite units</h3><p>' + tierLine(f.high) + '</p>' : '') +
       '<a class="roster" href="index.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
-      '</div></div>' + questsHtml(f) + '</div>';
+      '</div></div>' + questsHtml(f) + loreHtml(f) + '</div>';
   }
   return '<div class="fcard' + (open.has(f.id) ? ' open' : '') + '" data-id="' + f.id + '">' +
     '<div class="fhead">' +

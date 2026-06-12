@@ -142,3 +142,8 @@ needed beyond Node.
   overview in `eopData/.../factionOverviews.lua`) — rendered as a chronicle
   index: scannable title rows with dotted leaders, each unfolding the mod
   team's description of triggers, choices and rewards on demand
+- Chronicles & events: below the questlines, the in-game scroll texts and
+  event popups from each faction's campaign scripts (`Faction_Scripts/`,
+  only the files agoV3.lua actually loads) — 62 quest announcements,
+  choices and reward notices with their lore quotes, in the same index
+  style (factions whose scripts build texts dynamically have none)
