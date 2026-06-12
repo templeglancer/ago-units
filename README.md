@@ -97,13 +97,23 @@ needed beyond Node.
   guild scripts) and which factions are offered each guild
 - Shared chains are faction-aware: recruit lists are grouped per faction, and
   selecting a faction in the dropdown shows that faction's own building names,
-  pictures and recruits (e.g. Isengard's tier of the governance chain appears
-  as "Slave Pit" with Uruk recruits, not "Meeting Hall")
+  pictures, recruits and effect values (e.g. Isengard's tier of the governance
+  chain appears as "Slave Pit" with Uruk recruits, not "Meeting Hall"; the
+  smith chain's merged "Armour upgrades level 3–7" resolves to that faction's
+  exact tier, with event-unlocked levels kept as conditional notes)
+- Chains restricted to one settlement type carry a small city/castle tag, so
+  the paired city and castle versions of a same-named chain (two "Stables"
+  rows) are distinguishable
 - Tech-tree view on the buildings page: a settlement-size grid (Village →
   Huge City, city or castle, filterable by faction) showing which building
-  tier unlocks at each size — a per-faction build planner
+  tier unlocks at each size — a per-faction build planner; the castle toggle
+  relabels the columns with the castle stage names (Motte & Bailey → Citadel)
 - Factions page (`factions.html`): all 26 playable factions grouped into Free
   Peoples / Neutral / Shadow, each with its symbol, leader and capital, the
   full campaign-selection overview, roster breakdown, and early/mid/elite
   unit tiers (from `factionData.lua`) linking to the unit page; "View full
   roster" opens the unit page pre-filtered (`index.html?faction=...`)
+- Each faction card also states how far its smiths can upgrade unit armour
+  (factions differ widely: level 3 for Rohan, level 7 for the dwarven realms)
+  with event-unlocked levels noted separately, linking to the smith chain on
+  the buildings page

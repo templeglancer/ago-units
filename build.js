@@ -597,9 +597,46 @@ function parseFactionLua() {
   return out;
 }
 
+// Each faction's reachable armour-upgrade tier, scanned across every chain's
+// `armour` capability lines (factions differ widely: the smith chain caps some
+// at level 3 and others at 5, with event-unlocked levels beyond). Levels gated
+// by region, event or guild membership count as conditional extras.
+function smithingSummary(chains, ownerMap, guilds, cultures) {
+  const all = Object.keys(ownerMap);
+  // factions clauses sometimes name a culture instead of a faction tag
+  const expand = (facs) => all.filter((t) => facs.includes(t) || facs.includes(cultures[t]));
+  const out = {};
+  for (const t of all) out[t] = { base: 0, cond: 0, chain: '', tier: 0 };
+  for (const chain of chains) {
+    // script-placed unique chains (every level free) aren't normally buildable
+    const scripted = chain.levels.every((l) => !l.cost);
+    const guild = !!guilds[chain.name];
+    for (const l of chain.levels) {
+      const gated = guild || scripted || l.hr.some((h) => h !== 'unlocked') || l.ev.length > 0;
+      // a level restricted to some factions can only grant effects to those
+      const ltags = l.facs.length ? new Set(expand(l.facs)) : null;
+      for (const e of l.effects) {
+        if (e.key !== 'armour') continue;
+        const efacs = effectFacs(e.cond);
+        let tags = efacs.length ? expand(efacs) : ltags ? [...ltags] : all;
+        if (ltags) tags = tags.filter((t) => ltags.has(t));
+        const condEff = /event_counter|hidden_resource/.test(e.cond);
+        for (const t of tags) {
+          const s = out[t];
+          if (gated || condEff) { if (e.val > s.cond) s.cond = e.val; }
+          else if (e.val > s.base) { s.base = e.val; s.chain = chain.name; s.tier = l.tier; }
+        }
+      }
+    }
+  }
+  return out;
+}
+
 // Faction overview model: campaign_descriptions.txt blurbs + factionData.lua
 // tiers + roster counts from the unit model.
-function buildFactionsModel(units, ownerMap, unitsByType) {
+function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, guilds, cultures) {
+  const smithing = smithingSummary(chains, ownerMap, guilds, cultures);
+  const chainBySlug = new Map(buildings.map((b) => [b.slug, b]));
   const cdesc = parseExportUnits(CAMPAIGN_DESCR_TXT);
   const facLua = parseFactionLua();
   const sectionOrder = [...new Set(units.map((u) => u.faction))];
@@ -633,6 +670,11 @@ function buildFactionsModel(units, ownerMap, unitsByType) {
       else counts.infantry += 1;
     }
     const symTga = path.join(FACTION_SYMBOL_DIR, tag + '.tga');
+    const sm = smithing[tag] || { base: 0, cond: 0, chain: '', tier: 0 };
+    const smSlug = sm.chain ? chainSlug(sm.chain) : '';
+    const smChain = chainBySlug.get(smSlug);
+    // name the tier that actually grants the level, resolved for this faction
+    const smLvl = smChain && smChain.levels[sm.tier - 1];
     out.push({
       slug: chainSlug(title),
       section,
@@ -643,6 +685,12 @@ function buildFactionsModel(units, ownerMap, unitsByType) {
       heir: ((descr.match(/Heir:\s*([^\n]+)/) || [])[1] || '').trim(),
       capital: ((descr.match(/Capital:\s*([^\n]+)/) || [])[1] || '').trim(),
       counts,
+      smith: {
+        base: sm.base,
+        cond: sm.cond > sm.base ? sm.cond : 0,
+        slug: smChain ? smSlug : '',
+        cname: smLvl ? (smLvl.names[section] || smLvl.name) : '',
+      },
       low: linkify(lua.low), mid: linkify(lua.mid), high: linkify(lua.high),
       descr,
     });
@@ -812,6 +860,30 @@ function chainCategory(chain, rareHr) {
 // ("law_bonus 2 requires factions { saxons }" × 10). Group by key: plain
 // factions-only variants collapse into one value or a range; event/region
 // conditions keep a * marker with the requirement in a tooltip.
+function effectText(key, vals) {
+  const label = EFFECT_LABELS[key];
+  const lo = vals[0];
+  const hi = vals[vals.length - 1];
+  if (FLAG_KEYS.has(key)) return label;
+  if (LEVEL_KEYS.has(key)) return label + ' level ' + (lo === hi ? lo : lo + '–' + hi);
+  if (PCT_KEYS.has(key)) return label + ' −' + (lo === hi ? lo : lo + '–' + hi) + '%';
+  if (lo < 0 && hi > 0) return label + ' ' + lo + '–+' + hi;
+  if (hi <= 0) return label + ' −' + (lo === hi ? -hi : -hi + '–' + -lo);
+  return label + ' +' + (lo === hi ? hi : lo + '–' + hi);
+}
+
+function renderEffectGroups(groups) {
+  return groups.map((g) => {
+    const vals = [...new Set(g.vals)].sort((a, b) => a - b);
+    const txt = effectText(g.key, vals);
+    if (g.cond) {
+      const safe = g.cond.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      return `<span class="cond" title="requires: ${safe}">${txt}*</span>`;
+    }
+    return txt;
+  });
+}
+
 function aggregateEffects(effects) {
   const byKey = new Map();
   for (const e of effects) {
@@ -820,24 +892,32 @@ function aggregateEffects(effects) {
     if (!byKey.has(k)) byKey.set(k, { key: e.key, vals: [], cond: conditional ? e.cond : '' });
     byKey.get(k).vals.push(e.val);
   }
-  return [...byKey.values()].map((g) => {
-    const vals = [...new Set(g.vals)].sort((a, b) => a - b);
-    const label = EFFECT_LABELS[g.key];
-    const lo = vals[0];
-    const hi = vals[vals.length - 1];
-    let txt;
-    if (FLAG_KEYS.has(g.key)) txt = label;
-    else if (LEVEL_KEYS.has(g.key)) txt = label + ' level ' + (lo === hi ? lo : lo + '–' + hi);
-    else if (PCT_KEYS.has(g.key)) txt = label + ' −' + (lo === hi ? lo : lo + '–' + hi) + '%';
-    else if (lo < 0 && hi > 0) txt = label + ' ' + lo + '–+' + hi;
-    else if (hi <= 0) txt = label + ' −' + (lo === hi ? -hi : -hi + '–' + -lo);
-    else txt = label + ' +' + (lo === hi ? hi : lo + '–' + hi);
-    if (g.cond) {
-      const safe = g.cond.replace(/"/g, '&quot;').replace(/</g, '&lt;');
-      return `<span class="cond" title="requires: ${safe}">${txt}*</span>`;
-    }
-    return txt;
-  });
+  return renderEffectGroups([...byKey.values()]);
+}
+
+const effectFacs = (cond) => ((cond.match(/factions\s*\{([^}]*)\}/) || [])[1] || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+
+// Resolve the effect list from one faction's point of view: variants gated to
+// other factions drop out, and the factions clause itself disappears from the
+// condition tooltip (only the real event/region requirement remains). Where a
+// faction has several unconditional values for a key, the highest applies.
+// EDB factions clauses sometimes name a culture instead of a faction tag, so
+// the faction's culture also counts as a match.
+function effectsForFaction(effects, facTag, culture) {
+  const byKey = new Map();
+  for (const e of effects) {
+    const facs = effectFacs(e.cond);
+    if (facs.length && !facs.includes(facTag) && !(culture && facs.includes(culture))) continue;
+    let cond = e.cond.replace(/factions\s*\{[^}]*\}\s*(and\s+)?/, '').trim();
+    if (!/event_counter|hidden_resource/.test(cond)) cond = '';
+    const k = e.key + (cond ? '|' + cond : '');
+    if (!byKey.has(k)) byKey.set(k, { key: e.key, vals: [], cond });
+    byKey.get(k).vals.push(e.val);
+  }
+  return renderEffectGroups([...byKey.values()].map((g) => (
+    g.cond ? g : { ...g, vals: [Math.max(...g.vals)] }
+  )));
 }
 
 // Chain slugs must be reproducible from both pages (unit-page links point at
@@ -905,8 +985,18 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
           else for (const f of rf) e.f.add(f);
         }
       }
+      // per-faction resolved effects (armour tiers, law, …), stored only where
+      // they differ from the merged all-factions view
+      const ffx = {};
+      if (l.effects.some((e) => /factions\s*\{/.test(e.cond))) {
+        const def = aggregateEffects(l.effects).join('');
+        for (const t of (candTags.length ? candTags : allTags)) {
+          const fx = effectsForFaction(l.effects, t, cultures[t]);
+          if (fx.join('') !== def) ffx[ownerMap[t]] = fx;
+        }
+      }
       return {
-        name: defName, names, pics,
+        name: defName, names, pics, ffx,
         kind: l.kind, tier: l.tier, of: l.of,
         cost: l.cost, time: l.time,
         min: l.min.replace(/_/g, ' '),
@@ -1222,7 +1312,7 @@ function buildModel() {
     for (const r of u.recruit) if (!published.has(r.c)) r.c = '';
   }
 
-  const factionPages = buildFactionsModel(units, ownerMap, unitsByType);
+  const factionPages = buildFactionsModel(units, ownerMap, unitsByType, edbChains, buildings, guilds, cultures);
 
   return {
     units, factions, projectiles, mounts, buildings, factionPages,
@@ -2334,6 +2424,7 @@ tr.bld:hover { background: #e2d3ac; }
 tr.bld.open { background: #ddcda2; }
 td.name { font-weight: 600; font-size: 15.5px; }
 td.name .guildtag { font-weight: 400; font-style: italic; color: var(--gold); font-size: 13px; margin-left: 8px; }
+td.name .kindtag { font-weight: 400; font-style: italic; color: var(--ink-soft); font-size: 13px; margin-left: 8px; }
 td.name img.bpic {
   height: 34px;
   width: 34px;
@@ -2527,14 +2618,22 @@ function costRange(b) {
   return lo === hi ? String(lo) : lo + '–' + hi;
 }
 
+// chains restricted to one settlement type get a tag, so the paired
+// city/castle versions of a same-named chain are distinguishable
+function chainKind(b) {
+  const kinds = [...new Set(b.levels.map(l => l.kind))];
+  return kinds.length === 1 && kinds[0] ? kinds[0] : '';
+}
+
 function rowHtml(b) {
   const first = b.levels.filter(lvlVisible)[0] || b.levels[0];
   const rpic = lvlPic(first);
   const pic = rpic ? '<img class="bpic" loading="lazy" alt="" src="' + rpic + '">' : '';
+  const kind = chainKind(b);
   const facs = state.fac ? (b.facs.length ? state.fac : 'All factions')
     : b.facs.length ? (b.facs.length > 4 ? b.facs.slice(0, 4).join(', ') + ' +' + (b.facs.length - 4) : b.facs.join(', ')) : 'All factions';
   return '<tr class="bld' + (state.open.has(b.id) ? ' open' : '') + '" data-id="' + b.id + '">' +
-    '<td class="name">' + pic + esc(lvlName(first)) + (b.guild ? '<span class="guildtag">guild</span>' : '') + '</td>' +
+    '<td class="name">' + pic + esc(lvlName(first)) + (b.guild ? '<span class="guildtag">guild</span>' : '') + (kind ? '<span class="kindtag">' + kind + '</span>' : '') + '</td>' +
     '<td class="num">' + b.tiers + '</td>' +
     '<td class="num hide-xs">' + costRange(b) + '</td>' +
     '<td class="facs">' + esc(facs) + '</td>' +
@@ -2579,7 +2678,8 @@ function levelHtml(l) {
   const head = 'Tier ' + l.tier + '/' + l.of + ' — ' + esc(lvlName(l)) +
     ' <span class="dim">' + [l.kind, l.cost ? l.cost + ' gold' : '', l.time ? l.time + (l.time === 1 ? ' turn' : ' turns') : '', l.min && l.min !== 'village' ? 'from ' + esc(l.min) : ''].filter(Boolean).join(' · ') + '</span>';
   const parts = ['<div class="tiername">' + head + '</div>'];
-  if (l.effects.length) parts.push('<div class="fx"><b>Effects</b>' + l.effects.join(' · ') + '</div>');
+  const fx = (state.fac && l.ffx[state.fac]) || l.effects;
+  if (fx.length) parts.push('<div class="fx"><b>Effects</b>' + fx.join(' · ') + '</div>');
   const rec = recruitsHtml(l);
   if (rec) parts.push(rec);
   const reqs = [];
@@ -2605,8 +2705,12 @@ function detailHtml(b) {
 
 // ---- Tech-tree view: which tier unlocks at which settlement size ----
 const SIZES = ['village', 'town', 'large town', 'city', 'large city', 'huge city'];
-const SIZE_LABELS = ['Village', 'Town', 'Large Town', 'City', 'Large City', 'Huge City'];
-const CASTLE_NOTE = 'Castle equivalents: Town = Motte &amp; Bailey, Large Town = Wooden Castle, City = Castle, Large City = Fortress, Huge City = Citadel.';
+// castle settlements use the same six internal size steps, but with their own
+// stage names — switching the toggle relabels the columns accordingly
+const SIZE_LABELS = {
+  city: ['Village', 'Town', 'Large Town', 'City', 'Large City', 'Huge City'],
+  castle: ['Village', 'Motte &amp; Bailey', 'Wooden Castle', 'Castle', 'Fortress', 'Citadel'],
+};
 
 function treeLevels(b) {
   return b.levels.filter(l =>
@@ -2615,8 +2719,7 @@ function treeLevels(b) {
 }
 
 function renderTree(list) {
-  let html = state.kind === 'castle' ? '<p class="note">' + CASTLE_NOTE + '</p>' : '';
-  html += '<table><thead><tr><th>Building</th>' + SIZE_LABELS.map(s => '<th>' + s + '</th>').join('') + '</tr></thead><tbody>';
+  let html = '<table><thead><tr><th>Building</th>' + SIZE_LABELS[state.kind].map(s => '<th>' + s + '</th>').join('') + '</tr></thead><tbody>';
   let shown = 0;
   for (const cat of CATS) {
     const group = list.filter(b => b.cat === cat).map(b => ({ b, ls: treeLevels(b) })).filter(x => x.ls.length);
@@ -2712,7 +2815,7 @@ function openFromHash() {
   if (!b || state.open.has(b.id)) return;
   state.q = ''; state.cat = '';
   document.getElementById('q').value = '';
-  for (const x of document.querySelectorAll('.catbtns button')) x.classList.toggle('active', x.dataset.cat === '');
+  for (const x of document.querySelectorAll('#cats button')) x.classList.toggle('active', x.dataset.cat === '');
   state.open.add(b.id);
   render();
   const row = document.querySelector('tr.bld[data-id="' + b.id + '"]');
@@ -2951,6 +3054,24 @@ function descrHtml(f) {
   }).join('');
 }
 
+// Factions differ in how far their smiths can upgrade unit armour; events can
+// unlock levels beyond the everyday maximum.
+function smithHtml(f) {
+  const s = f.smith;
+  if (!s || (!s.base && !s.cond)) return '';
+  const link = s.slug
+    ? ' &middot; via <a class="unitlink" href="buildings.html#' + s.slug + '">' + esc(s.cname) + '</a>'
+    : '';
+  let txt;
+  if (s.base) {
+    txt = 'Smiths can upgrade unit armour to level ' + s.base +
+      (s.cond ? ', and to level ' + s.cond + ' through special events or buildings' : '') + '.';
+  } else {
+    txt = 'Armour upgrades (to level ' + s.cond + ') only through special events or buildings.';
+  }
+  return '<h3>Armour upgrades</h3><p>' + txt + link + '</p>';
+}
+
 function cardHtml(f) {
   const c = f.counts;
   const breakdown = [
@@ -2965,6 +3086,7 @@ function cardHtml(f) {
       '<div class="col">' +
       (f.heir ? '<h3>Heir</h3><p>' + esc(f.heir) + '</p>' : '') +
       '<h3>Roster (' + c.total + ' units)</h3><p>' + breakdown + '</p>' +
+      smithHtml(f) +
       (f.low.length ? '<h3>Early units</h3><p>' + tierLine(f.low) + '</p>' : '') +
       (f.mid.length ? '<h3>Mid-tier units</h3><p>' + tierLine(f.mid) + '</p>' : '') +
       (f.high.length ? '<h3>Elite units</h3><p>' + tierLine(f.high) + '</p>' : '') +
