@@ -5306,7 +5306,6 @@ function buildAboutHtml() {
   const rd = (f) => fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
   // the docs carry their own top heading; the page supplies its own
   const stripH1 = (s) => s.replace(/^#+ .*\r?\n/, '');
-  const changelog = stripH1(rd(path.join(MOD_ROOT, 'docs', 'Changelog.md')));
   const credits = stripH1(rd(path.join(MOD_ROOT, 'docs', 'Credits.md')));
   const generated = new Date().toISOString().slice(0, 10);
 
@@ -5420,24 +5419,23 @@ footer {
 </header>
 
 <main>
-<nav class="toc"><a href="#site">This site</a> &middot; <a href="#credits">Credits</a> &middot; <a href="#changelog">Release notes</a></nav>
+<nav class="toc"><a href="#site">This site</a> &middot; <a href="#credits">Credits</a></nav>
 
 <h2 id="site">This site</h2>
-<p>The AGO Compendium is generated directly from the mod's own data files &mdash; every stat,
-threshold, trigger and scroll on these pages is read from the same files the game reads, and the
-whole site is rebuilt with one command after each mod update. The single exception is the combat
-primer on the <a class="x" href="mechanics.html">Mechanics page</a>, which reflects
-community-established engine knowledge.</p>
+<p>The AGO Compendium is an independent data-reference platform for the AGO mod. It is generated
+directly from the mod's own data files &mdash; every stat, threshold, trigger and scroll on these
+pages is read from the same files the game reads, and the whole site is rebuilt with one command
+after each mod update. The single exception is the combat primer on the
+<a class="x" href="mechanics.html">Mechanics page</a>, which reflects community-established engine
+knowledge. The site is not affiliated with the mod's development team; their work is credited
+below.</p>
 
 <h2 id="credits">Credits</h2>
 ${mdHtml(credits)}
 
-<h2 id="changelog">Release notes</h2>
-${mdHtml(changelog)}
-
 </main>
 
-<footer>Generated ${generated} from <code>docs/Changelog.md</code> &amp; <code>docs/Credits.md</code></footer>
+<footer>Generated ${generated} from <code>docs/Credits.md</code></footer>
 </body>
 </html>
 `;
@@ -5754,7 +5752,7 @@ writePage(OUT_AHTML, buildAnnalsHtml(model));
 console.log(`Annals page: ${model.annals.events.length} event scrolls, ${model.annals.disasters.length} calamities.`);
 writePage(path.join(__dirname, 'mechanics.html'), buildMechanicsHtml(model));
 writePage(path.join(__dirname, 'about.html'), buildAboutHtml());
-console.log('About page: changelog + credits rendered.');
+console.log('About page: credits rendered.');
 console.log(`Mechanics page: ${model.mechanics.cfg.length} settings, ${model.mechanics.palantir.stones.length} palantiri, ${model.mechanics.ring.stages.length} ring stages.`);
 
 // prune building pictures the model no longer references (default pics are

@@ -20,8 +20,7 @@ game systems: a combat primer - attack/defence, armour-piercing, charge,
 missiles, morale, experience, clearly marked as community-established
 engine knowledge - plus the One Ring constants and stages, the six
 Palantiri, spy-network costs, raiding multipliers and every AGO.cfg
-player toggle with a description) and **about.html** (the mod team`s full
-release notes and credits). Every page footer shows a random Tolkien
+player toggle with a description) and **about.html** (the mod team's credits). Every page footer shows a random Tolkien
 loading-screen quote from the mod`s 850.
 
 ## Viewing
