@@ -3130,12 +3130,34 @@ h2.side.evil { color: var(--bad); }
   color: var(--ink-soft);
   margin: 12px 0 4px;
 }
-.fbody p { margin: 0 0 8px; max-width: 80ch; text-align: justify; hyphens: auto; }
+.fbody p { margin: 0 0 8px; max-width: 66ch; line-height: 1.5; }
 .fbody .quote { font-style: italic; color: var(--ink-soft); }
 .fbody .quests { border-top: 1px dotted var(--line); margin-top: 14px; padding-top: 2px; }
-.fbody .quest { margin: 0 0 12px; }
-.fbody .quest b { color: var(--accent); display: block; margin-bottom: 2px; }
-.fbody .quest p { margin: 2px 0 6px; max-width: 95ch; }
+/* questline index: a chronicle's table of contents — title rows with dotted
+   leaders, each unfolding its description on demand */
+.quest { margin: 0; }
+.qrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 2px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.qrow .qmark { flex: none; color: var(--gold); font-size: 12px; transform: translateY(-1px); }
+.qrow .qtitle { font-family: var(--display); font-weight: 600; font-size: 14px; letter-spacing: .02em; }
+.qrow .qleader { flex: 1; min-width: 30px; border-bottom: 2px dotted rgba(139,115,71,.5); transform: translateY(-4px); }
+.qrow .qtoggle { flex: none; width: 14px; text-align: center; color: var(--ink-soft); font-size: 15px; }
+.qrow:hover .qtitle { color: var(--accent); }
+.qrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
+.quest.qopen .qtitle { color: var(--accent); }
+.qbody { padding: 2px 26px 12px; }
+.qbody p { margin: 2px 0 8px; max-width: 66ch; line-height: 1.5; }
 .fbody a.unitlink { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); cursor: pointer; }
 .fbody a.unitlink:hover { background: rgba(122,31,31,.08); }
 .fbody .roster {
@@ -3183,6 +3205,7 @@ footer {
 const FAC = ${facJson};
 FAC.forEach((f, i) => { f.id = i; });
 const open = new Set();
+const qopen = new Set(); // expanded questline rows, "slug:index"
 
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -3208,13 +3231,26 @@ function descrHtml(f) {
 }
 
 // Questlines and campaign scripts, from the in-game faction overview
-// (factionOverviews.lua). Long entries keep their paragraphs and line breaks.
+// (factionOverviews.lua). Rendered as an index of title rows — the list of
+// quest names is scannable on its own — each unfolding its description.
 function questsHtml(f) {
   if (!f.quests.length) return '';
   return '<div class="quests"><h3>Questlines &amp; campaign scripts (' + f.quests.length + ')</h3>' +
-    f.quests.map(q => '<div class="quest"><b>' + esc(q.t) + '</b>' +
-      q.d.split(/\\n{2,}/).map(p => '<p>' + esc(p).replace(/\\n/g, '<br>') + '</p>').join('') +
-      '</div>').join('') + '</div>';
+    f.quests.map((q, i) => {
+      const key = f.slug + ':' + i;
+      const isOpen = qopen.has(key);
+      return '<div class="quest' + (isOpen ? ' qopen' : '') + '">' +
+        '<button class="qrow" data-q="' + key + '" aria-expanded="' + isOpen + '">' +
+          '<span class="qmark">&#10022;</span>' +
+          '<span class="qtitle">' + esc(q.t) + '</span>' +
+          '<span class="qleader"></span>' +
+          '<span class="qtoggle">' + (isOpen ? '&minus;' : '+') + '</span>' +
+        '</button>' +
+        (isOpen ? '<div class="qbody">' +
+          q.d.split(/\\n{2,}/).map(p => '<p>' + esc(p).replace(/\\n/g, '<br>') + '</p>').join('') +
+        '</div>' : '') +
+      '</div>';
+    }).join('') + '</div>';
 }
 
 // Factions differ in how far their smiths can upgrade unit armour; events can
@@ -3279,6 +3315,15 @@ function render() {
 
 document.getElementById('main').addEventListener('click', (e) => {
   if (e.target.closest('a')) return;
+  const qrow = e.target.closest('.qrow');
+  if (qrow) {
+    const k = qrow.dataset.q;
+    if (qopen.has(k)) qopen.delete(k); else qopen.add(k);
+    render();
+    const again = document.querySelector('.qrow[data-q="' + k + '"]');
+    if (again) again.focus({ preventScroll: true });
+    return;
+  }
   const card = e.target.closest('.fcard');
   if (!card) return;
   const id = Number(card.dataset.id);

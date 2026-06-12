@@ -130,5 +130,6 @@ needed beyond Node.
   the buildings page
 - Questlines & campaign scripts: every faction card lists its unique quests
   and scripted features (95 across the 26 factions, from the in-game faction
-  overview in `eopData/.../factionOverviews.lua`) — triggers, choices and
-  rewards as written by the mod team
+  overview in `eopData/.../factionOverviews.lua`) — rendered as a chronicle
+  index: scannable title rows with dotted leaders, each unfolding the mod
+  team's description of triggers, choices and rewards on demand
