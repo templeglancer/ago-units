@@ -21,7 +21,10 @@ missiles, morale, experience, clearly marked as community-established
 engine knowledge - plus the One Ring constants and stages, the six
 Palantiri, spy-network costs, raiding multipliers and every AGO.cfg
 player toggle with a description) and **about.html** (the mod team's credits). Every page footer shows a random Tolkien
-loading-screen quote from the mod`s 850.
+loading-screen quote from the mod`s 850. **changes.html** lists every unit
+whose values changed in the latest update (old → new, with added/removed
+units), and changed units carry a Δ badge with an inline delta in their
+expanded view.
 
 ## Viewing
 
@@ -69,8 +72,23 @@ Whenever those files change, regenerate the page with:
 node build.js
 ```
 
-This rewrites `index.html` and `buildings.html` in place. No dependencies are
-needed beyond Node.
+This rewrites all pages in place. No dependencies are needed beyond Node.
+
+### Updating to a new mod version (value-change archive)
+
+The site keeps a baseline snapshot of unit values in `archive/baseline.json`
+and shows what changed since then on `changes.html`. When a new mod version
+arrives, run these in order:
+
+```
+node build.js --snapshot   # freeze the CURRENT (old) values as the baseline
+# ...now apply the mod update to ../data and ../eopData...
+node build.js              # rebuild; changes.html diffs new values vs baseline
+```
+
+`--snapshot` only writes the baseline and exits; a normal build diffs the
+current data against it. The baseline advances only when you re-run
+`--snapshot`, so "changes since the last update" stays meaningful.
 
 ## Features
 

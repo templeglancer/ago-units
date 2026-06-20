@@ -2029,6 +2029,88 @@ function cleanText(s) {
     .trim();
 }
 
+// ----------------------------------------------------------- data archive
+// A per-version snapshot of unit values lets each update show what changed.
+// `node build.js --snapshot` freezes the current data as the baseline; a
+// normal build diffs the current data against that baseline.
+const DIFF_STATS = [
+  { k: 'men', label: 'Soldiers' },
+  { k: 'hp', label: 'Hit points' },
+  { k: 'atk', label: 'Melee attack' },
+  { k: 'chg', label: 'Charge bonus' },
+  { k: 'msl', label: 'Missile attack' },
+  { k: 'rng', label: 'Range' },
+  { k: 'ammo', label: 'Ammunition' },
+  { k: 'armour', label: 'Armour' },
+  { k: 'skill', label: 'Defence skill' },
+  { k: 'shield', label: 'Shield' },
+  { k: 'morale', label: 'Morale' },
+  { k: 'cost', label: 'Cost', lower: true },
+  { k: 'upkeep', label: 'Upkeep', lower: true },
+  { k: 'turns', label: 'Turns to train', lower: true },
+];
+
+function modVersion() {
+  const f = path.join(MOD_ROOT, 'eopData', 'config', 'uiCfg.json');
+  if (!fs.existsSync(f)) return '';
+  const mm = fs.readFileSync(f, 'utf8').match(/"modVersion"\s*:\s*"([^"]+)"/);
+  return mm ? mm[1] : '';
+}
+
+function unitSnapshot(units, version) {
+  const out = { version, units: {} };
+  for (const u of units) {
+    const rec = { n: u.name, f: u.faction };
+    for (const s of DIFF_STATS) rec[s.k] = u[s.k] ?? null;
+    out.units[u.slug] = rec;
+  }
+  return out;
+}
+
+const ARCHIVE_FILE = path.join(__dirname, 'archive', 'baseline.json');
+function loadBaseline() {
+  if (!fs.existsSync(ARCHIVE_FILE)) return null;
+  try { return JSON.parse(fs.readFileSync(ARCHIVE_FILE, 'utf8')); } catch { return null; }
+}
+function writeBaseline(snap) {
+  fs.mkdirSync(path.dirname(ARCHIVE_FILE), { recursive: true });
+  fs.writeFileSync(ARCHIVE_FILE, JSON.stringify(snap), 'utf8');
+}
+
+// Compare a baseline snapshot to the current units: per-stat changes, plus
+// units added and removed since the baseline.
+function diffModel(baseline, units, toVersion) {
+  if (!baseline || !baseline.units) return null;
+  const base = baseline.units;
+  const cur = {};
+  for (const u of units) cur[u.slug] = u;
+  const changed = [];
+  const added = [];
+  const removed = [];
+  for (const u of units) {
+    const b = base[u.slug];
+    if (!b) { added.push({ slug: u.slug, name: u.name, faction: u.faction }); continue; }
+    const fields = [];
+    for (const s of DIFF_STATS) {
+      const from = b[s.k] ?? null;
+      const to = u[s.k] ?? null;
+      if (from !== to) fields.push({ label: s.label, from, to, lower: !!s.lower });
+    }
+    if (fields.length) changed.push({ slug: u.slug, name: u.name, faction: u.faction, fields });
+  }
+  for (const slug of Object.keys(base)) {
+    if (!cur[slug]) removed.push({ slug, name: base[slug].n, faction: base[slug].f });
+  }
+  return { from: baseline.version, to: toVersion, changed, added, removed };
+}
+
+// Compact per-slug map embedded in the unit page for inline deltas.
+function compactDiff(diff) {
+  const units = {};
+  for (const c of diff.changed) units[c.slug] = c.fields.map((f) => ({ l: f.label, f: f.from, t: f.to, lo: f.lower }));
+  return { from: diff.from, to: diff.to, units };
+}
+
 function buildModel() {
   const names = parseExportUnits(UNITS_TXT);
   const edu = parseEdu(EDU_TXT);
@@ -2266,6 +2348,7 @@ function buildHtml(model) {
   const factionsJson = JSON.stringify(model.factions);
   const projJson = JSON.stringify(model.projectiles);
   const mountJson = JSON.stringify(model.mounts);
+  const patchJson = JSON.stringify(model.diffClient || { from: '', to: '', units: {} });
   const generated = new Date().toISOString().slice(0, 10);
 
   return `<!DOCTYPE html>
@@ -2459,6 +2542,28 @@ tr.faction-row td .fcount { color: var(--ink-soft); font-size: 12px; letter-spac
   vertical-align: 1px;
 }
 .badge.eop { border-color: var(--accent); color: var(--accent); }
+.badge.upd { border-color: var(--gold); color: var(--gold); }
+.patchline {
+  margin: 10px 0 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-dark);
+  border-left: 3px solid var(--gold);
+  background: #f6efda;
+  border-radius: 3px;
+  font-size: 13.5px;
+}
+.patchline > b {
+  display: block;
+  font-family: var(--display);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.patchline .pchg { display: inline-block; margin: 0 12px 3px 0; white-space: nowrap; }
+.patchline .pchg.up { color: #2f5d31; }
+.patchline .pchg.down { color: #8a2525; }
 tr.detail td {
   background: #faf3df;
   border: 1px solid var(--line-dark);
@@ -2677,7 +2782,7 @@ footer {
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -2737,6 +2842,7 @@ const UNITS = ${dataJson};
 const FACTIONS = ${factionsJson};
 const PROJ = ${projJson};
 const MOUNTS = ${mountJson};
+const PATCH = ${patchJson};
 // In-game soldier counts are the data-file numbers scaled by the unit-size
 // setting; this site shows Huge (x2.5), the scale the mod is balanced around.
 const SIZE_SCALE = 2.5;
@@ -2821,6 +2927,7 @@ function rowHtml(u) {
   return '<tr class="unit' + (state.open.has(u.id) ? ' open' : '') + '" data-id="' + u.id + '">' +
     '<td class="name">' + card + esc(u.name) +
       (u.eop ? '<span class="badge eop" title="Added at runtime by the M2TWEOP engine overhaul">EOP</span>' : '') +
+      (PATCH.units[u.slug] ? '<span class="badge upd" title="Stats changed in ' + PATCH.to + ' — open for details">&#916;</span>' : '') +
       ' <span class="cls">' + typeLabel(u) + '</span></td>' +
     '<td class="num">' + men + '</td>' +
     '<td class="num">' + fmt(u.atk) + badges(u.meleeAttr) + '</td>' +
@@ -2939,9 +3046,24 @@ function detailHtml(u) {
     card = '<div class="detail-card"><img alt="" class="small" data-last="1" src="' + u.card + '"></div>';
   }
   return '<tr class="detail"><td colspan="13"><div class="detail-inner">' + card +
-    '<div class="detail-desc">' + (u.short ? '<p class="short">' + esc(u.short) + '</p>' : '') + paras + '</div>' +
+    '<div class="detail-desc">' + (u.short ? '<p class="short">' + esc(u.short) + '</p>' : '') + paras + patchBlock(u) + '</div>' +
     '<div class="detail-stats"><table>' + rows.join('') + '</table></div>' +
   '</div></td></tr>';
+}
+
+// Inline "what changed this patch" note for a unit, from the embedded diff.
+function patchBlock(u) {
+  const fields = PATCH.units[u.slug];
+  if (!fields || !fields.length) return '';
+  const lines = fields.map(f => {
+    const from = f.f === null ? '—' : f.f;
+    const to = f.t === null ? '—' : f.t;
+    const up = (f.t === null ? -1 : f.t) - (f.f === null ? -1 : f.f);
+    const good = f.lo ? up < 0 : up > 0;
+    const arrow = up > 0 ? '&#9650;' : '&#9660;';
+    return '<span class="pchg ' + (good ? 'up' : 'down') + '">' + esc(f.l) + ' ' + from + ' &rarr; ' + to + ' ' + arrow + '</span>';
+  }).join('');
+  return '<div class="patchline"><b>Changed in ' + PATCH.to + '</b>' + lines + '</div>';
 }
 
 function render() {
@@ -3482,7 +3604,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4008,7 +4130,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4415,7 +4537,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4827,7 +4949,7 @@ footer {
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5153,7 +5275,7 @@ footer {
 <header>
   <h1>AGO &mdash; Annals</h1>
   <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5415,7 +5537,7 @@ footer {
 <header>
   <h1>AGO &mdash; About</h1>
   <p class="sub">The mod, its makers and its history &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="about.html" class="active">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
 </header>
 
 <main>
@@ -5633,7 +5755,7 @@ footer {
 <header>
   <h1>AGO &mdash; Mechanics</h1>
   <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -5726,9 +5848,201 @@ ${cfgRows}
 `;
 }
 
+// ------------------------------------------------------------- changes page
+
+function buildChangesHtml(model) {
+  const d = model.diff;
+  const generated = new Date().toISOString().slice(0, 10);
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fnum = (v) => v === null || v === undefined ? '—' : v;
+
+  let body;
+  if (!d) {
+    body = '<p class="empty">No baseline recorded yet, so there is nothing to compare. The first archived version becomes the baseline for the next update.</p>';
+  } else if (!d.changed.length && !d.added.length && !d.removed.length) {
+    body = '<p class="empty">No unit values changed between ' + esc(d.from) + ' and ' + esc(d.to) + '.</p>';
+  } else {
+    let html = '<p class="summary">' +
+      '<b>' + d.changed.length + '</b> units changed &middot; ' +
+      '<b>' + d.added.length + '</b> added &middot; ' +
+      '<b>' + d.removed.length + '</b> removed</p>';
+    if (d.changed.length) {
+      html += '<h2>Changed units</h2>';
+      let lastFac = null;
+      // already grouped well enough by sorting on faction then name
+      const sorted = d.changed.slice().sort((a, b) => a.faction.localeCompare(b.faction) || a.name.localeCompare(b.name));
+      for (const c of sorted) {
+        if (c.faction !== lastFac) {
+          lastFac = c.faction;
+          html += '<h3 class="fac">' + esc(c.faction) + '</h3>';
+        }
+        const deltas = c.fields.map(f => {
+          const up = (f.to === null ? -1 : f.to) - (f.from === null ? -1 : f.from);
+          const good = f.lower ? up < 0 : up > 0;
+          const arrow = up > 0 ? '&#9650;' : '&#9660;';
+          return '<span class="pchg ' + (good ? 'up' : 'down') + '">' + esc(f.label) + ' ' +
+            fnum(f.from) + ' &rarr; ' + fnum(f.to) + ' ' + arrow + '</span>';
+        }).join('');
+        html += '<div class="urow"><a class="uname" href="index.html#' + c.slug + '">' + esc(c.name) + '</a>' +
+          '<div class="deltas">' + deltas + '</div></div>';
+      }
+    }
+    if (d.added.length) {
+      html += '<h2>New units</h2><p class="ulist">' +
+        d.added.slice().sort((a, b) => a.name.localeCompare(b.name))
+          .map(u => '<a href="index.html#' + u.slug + '">' + esc(u.name) + '</a> <span class="dim">' + esc(u.faction) + '</span>').join(' &middot; ') +
+        '</p>';
+    }
+    if (d.removed.length) {
+      html += '<h2>Removed units</h2><p class="ulist removed">' +
+        d.removed.slice().sort((a, b) => a.name.localeCompare(b.name))
+          .map(u => esc(u.name) + ' <span class="dim">' + esc(u.faction) + '</span>').join(' &middot; ') +
+        '</p>';
+    }
+    body = html;
+  }
+
+  const title = d ? 'Changes from ' + esc(d.from) + ' to ' + esc(d.to) : 'Changes';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Changes</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+:root {
+  --parchment: #f3ecda;
+  --parchment-dark: #e9dfc6;
+  --row-alt: #eee4cd;
+  --ink: #2b2118;
+  --ink-soft: #5a4a38;
+  --accent: #7a1f1f;
+  --gold: #8a6d2f;
+  --line: #c9b88f;
+  --line-dark: #a89263;
+  --good: #2f5d31;
+  --bad: #8a2525;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--parchment);
+  background-image: radial-gradient(ellipse at top, rgba(255,252,240,.6), transparent 60%),
+                    radial-gradient(ellipse at bottom, rgba(120,90,40,.10), transparent 60%);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.45;
+}
+header {
+  text-align: center;
+  padding: 26px 16px 14px;
+  border-bottom: 3px double var(--line-dark);
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+}
+header h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: .12em;
+  margin: 0;
+  color: var(--accent);
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
+.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
+.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
+.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sitenav a:hover { color: var(--accent); }
+main { max-width: 920px; margin: 0 auto; padding: 16px 14px 60px; }
+.summary { text-align: center; font-size: 15px; color: var(--ink-soft); margin: 4px 0 18px; }
+.summary b { color: var(--ink); }
+h2 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 2px solid var(--line-dark);
+  padding-bottom: 4px;
+  margin: 28px 0 10px;
+}
+h3.fac {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 16px 0 6px;
+}
+.urow { padding: 5px 0; border-bottom: 1px dotted var(--line); }
+.uname { font-weight: 600; color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+.uname:hover { background: rgba(122,31,31,.08); }
+.deltas { margin-top: 2px; }
+.pchg { display: inline-block; margin: 0 14px 3px 0; white-space: nowrap; font-size: 14px; }
+.pchg.up { color: var(--good); }
+.pchg.down { color: var(--bad); }
+.ulist { max-width: 80ch; line-height: 1.9; }
+.ulist a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+.ulist.removed { color: var(--ink-soft); }
+.dim { color: var(--ink-soft); font-size: 13px; }
+.empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 36px 0; max-width: 70ch; margin: 0 auto; }
+.lead { max-width: 75ch; margin: 0 auto 14px; text-align: center; color: var(--ink-soft); font-style: italic; }
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 14px;
+  border-top: 3px double var(--line-dark);
+}
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  header h1 { font-size: 24px; }
+  main { padding: 8px 10px 60px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Changes</h1>
+  <p class="sub">${title}</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
+</header>
+
+<main>
+<p class="lead">Unit values that changed in the latest update. Each changed unit links to its full entry; green is an increase, red a decrease (for cost, upkeep and training time the colours are flipped, since lower is better).</p>
+${body}
+</main>
+
+<footer>Generated ${generated} &middot; compared against the archived ${d ? esc(d.from) : 'previous'} snapshot</footer>
+</body>
+</html>
+`;
+}
+
 // ---------------------------------------------------------------------- run
 
 const model = buildModel();
+
+// data archive: --snapshot freezes current values as the baseline and exits;
+// a normal build diffs current values against the stored baseline.
+const modVer = modVersion();
+if (process.argv.includes('--snapshot')) {
+  writeBaseline(unitSnapshot(model.units, modVer));
+  console.log(`Baseline snapshot written: ${modVer || '(no version)'}, ${model.units.length} units.`);
+  process.exit(0);
+}
+model.version = modVer;
+model.diff = diffModel(loadBaseline(), model.units, modVer);
+model.diffClient = model.diff ? compactDiff(model.diff) : null;
 
 // every page carries a random Tolkien loading-screen quote in its footer
 const loreQuotes = buildQuotes();
@@ -5753,6 +6067,10 @@ console.log(`Annals page: ${model.annals.events.length} event scrolls, ${model.a
 writePage(path.join(__dirname, 'mechanics.html'), buildMechanicsHtml(model));
 writePage(path.join(__dirname, 'about.html'), buildAboutHtml());
 console.log('About page: credits rendered.');
+writePage(path.join(__dirname, 'changes.html'), buildChangesHtml(model));
+console.log(model.diff
+  ? `Changes page: ${model.diff.changed.length} changed, ${model.diff.added.length} added, ${model.diff.removed.length} removed (${model.diff.from} -> ${model.diff.to}).`
+  : 'Changes page: no baseline yet.');
 console.log(`Mechanics page: ${model.mechanics.cfg.length} settings, ${model.mechanics.palantir.stones.length} palantiri, ${model.mechanics.ring.stages.length} ring stages.`);
 
 // prune building pictures the model no longer references (default pics are
