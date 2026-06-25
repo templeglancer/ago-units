@@ -287,6 +287,15 @@ a.ref:hover { background: rgba(122,31,31,.08); }
 .ref-box table th a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--line-dark); cursor: pointer; }
 .ref-box table th a:hover { color: var(--accent); }
 .ref-box td.best { color: var(--good); font-weight: 700; }
+.ref-box table tr.grp td {
+  font-family: var(--display);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+  border-bottom: 1px solid var(--line-dark);
+  padding-top: 12px;
+}
 tr.unit.flash td { animation: rowflash 1.6s ease-out; }
 @keyframes rowflash { 0% { background: #d8b86a; } 100% { background: var(--row-alt); } }
 @media (max-width: 900px) {
@@ -747,7 +756,15 @@ function openCompare() {
   row('Cost', us.map(u => u.cost), { lower: true });
   row('Upkeep', us.map(u => u.upkeep), { lower: true });
   row('Turns to train', us.map(u => u.turns), { lower: true });
-  html += '</table><p class="ref-note">Green marks the best value in each row (lowest for cost, upkeep, turns and heat).</p>';
+  // efficiency — value for gold, weighted by unit size so massed and elite
+  // units compare fairly (a stat × its soldier count, per 100 gold spent)
+  html += '<tr class="grp"><td></td><td colspan="' + us.length + '">Efficiency &mdash; value for gold</td></tr>';
+  const perGold = (u, v) => (u.cost > 0 && v != null) ? Math.round(v * inGame(u.men) / u.cost * 100) : null;
+  row('Cost per soldier', us.map(u => u.cost > 0 ? Math.round(u.cost / inGame(u.men)) : null), { lower: true, fmt: v => v + 'g' });
+  row('Upkeep per soldier', us.map(u => u.upkeep > 0 ? Math.round(u.upkeep / inGame(u.men) * 10) / 10 : null), { lower: true, fmt: v => v + 'g' });
+  row('Attack value / 100g', us.map(u => perGold(u, u.atk)));
+  row('Defence value / 100g', us.map(u => perGold(u, u.def)));
+  html += '</table><p class="ref-note">Green marks the best value in each row (lowest for cost, upkeep, turns and heat). Efficiency rows weigh each stat by the unit\u2019s soldier count, so a cheap massed regiment and an elite few-man unit are judged on the same footing.</p>';
   refBox.className = 'ref-box wide';
   refBox.innerHTML = html;
   refModal.hidden = false;
