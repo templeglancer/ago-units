@@ -39,6 +39,9 @@ const REBELS_TEXT_TXT = path.join(MOD_ROOT, 'data', 'text', 'rebel_faction_descr
 const OUT_RHTML = path.join(__dirname, 'regions.html');
 const HISTEV_TXT = path.join(MOD_ROOT, 'data', 'text', 'historic_events.txt');
 const OUT_AHTML = path.join(__dirname, 'annals.html');
+// EDU type names (lowercased) to omit — the author's own custom units, which
+// don't belong in a compendium of the game's original data.
+const EXCLUDE_UNITS = new Set(['guards of the fountain']);
 const TRAITS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_character_traits.txt');
 const ANCS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_ancillaries.txt');
 const VNVS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_VnVs.txt');
@@ -1249,6 +1252,7 @@ function buildBuildings(chains, bnames, ownerMap, cultures, guilds, unitsByType,
       // (f = null means every owner of the building can recruit it)
       const rec = new Map();
       for (const r of l.recruits) {
+        if (EXCLUDE_UNITS.has(r.unit.trim().toLowerCase())) continue; // author's custom units
         const u = unitsByType[r.unit.trim().toLowerCase()];
         const key = u ? u.name : r.unit;
         const rf = r.facs.map((t) => ownerMap[t]).filter(Boolean);
@@ -2171,6 +2175,8 @@ function buildModel() {
   let mercCount = 0;
 
   for (const u of [...edu, ...eop]) {
+    // author's own custom units, kept out of this game-data compendium
+    if (EXCLUDE_UNITS.has(u.type.trim().toLowerCase())) continue;
     const dict = (u.dict || u.type).trim();
     const key = dict.toLowerCase();
     const name = names[key] || u.type;
