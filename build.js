@@ -6135,6 +6135,23 @@ function niceTicks(min, max){
   return ticks;
 }
 
+function fmtTick(t){ return Math.abs(t) >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + 'k' : Math.round(t); }
+// a robust axis ceiling: if a few points sit far above the rest (a dominating
+// gap near the top, e.g. horde or single-entity units), cap just below the gap
+// so the bulk spreads out; those few clamp to the edge instead of flattening all.
+function robustMax(vals){
+  const s = vals.slice().sort((a, b) => b - a), n = s.length;
+  if (n < 12) return { cap: s[0], n: 0 };
+  const look = Math.max(3, Math.floor(n * 0.05));
+  let gapIdx = -1, best = 0;
+  for (let i = 0; i < look; i++) {
+    const hi = s[i], lo = s[i + 1];
+    if (lo <= 0) break;
+    if (hi / lo > best) { best = hi / lo; gapIdx = i; }
+  }
+  return (best >= 2.2 && gapIdx >= 0) ? { cap: s[gapIdx + 1], n: gapIdx + 1 } : { cap: s[0], n: 0 };
+}
+
 function draw(){
   const us = visible();
   const xm = METRICS[state.x], ym = METRICS[state.y];
@@ -6143,33 +6160,43 @@ function draw(){
   document.getElementById('empty').hidden = pts.length > 0;
   if (!pts.length) { document.getElementById('plot').innerHTML = ''; document.getElementById('boards').innerHTML = ''; return; }
   const W = 760, H = 470, M = { l: 72, r: 22, t: 18, b: 54 }, iw = W - M.l - M.r, ih = H - M.t - M.b;
-  let xmin = Math.min(...pts.map(p => p.x)), xmax = Math.max(...pts.map(p => p.x));
-  let ymin = Math.min(...pts.map(p => p.y)), ymax = Math.max(...pts.map(p => p.y));
+  const xv = pts.map(p => p.x), yv = pts.map(p => p.y);
+  const xc = robustMax(xv), yc = robustMax(yv);
+  let xmin = Math.min(...xv), xmax = xc.cap;
+  let ymin = Math.min(...yv), ymax = yc.cap;
   if (xm.costlike || state.x === 'men' || state.x === 'cps') xmin = Math.min(xmin, 0);
   ymin = Math.min(ymin, 0);
-  if (xmax === xmin) xmax += 1; if (ymax === ymin) ymax += 1;
+  if (xmax <= xmin) xmax = xmin + 1; if (ymax <= ymin) ymax = ymin + 1;
   const xt = niceTicks(xmin, xmax), yt = niceTicks(ymin, ymax);
   xmin = Math.min(xmin, xt[0]); xmax = Math.max(xmax, xt[xt.length - 1]);
   ymin = Math.min(ymin, yt[0]); ymax = Math.max(ymax, yt[yt.length - 1]);
-  const X = v => M.l + (v - xmin) / (xmax - xmin) * iw;
-  const Y = v => M.t + ih - (v - ymin) / (ymax - ymin) * ih;
+  const X = v => M.l + (Math.min(v, xmax) - xmin) / (xmax - xmin) * iw;
+  const Y = v => M.t + ih - (Math.min(v, ymax) - ymin) / (ymax - ymin) * ih;
+  const over = p => p.x > xmax || p.y > ymax;
   let g = '';
   // grid + ticks
-  for (const t of yt) { const y = Y(t); g += '<line class="grid" x1="' + M.l + '" y1="' + y.toFixed(1) + '" x2="' + (W - M.r) + '" y2="' + y.toFixed(1) + '"/>'; g += '<text class="tick" x="' + (M.l - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + (Math.abs(t) >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + 'k' : Math.round(t)) + '</text>'; }
-  for (const t of xt) { const x = X(t); g += '<text class="tick" x="' + x.toFixed(1) + '" y="' + (H - M.b + 18) + '" text-anchor="middle">' + (Math.abs(t) >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + 'k' : Math.round(t)) + '</text>'; }
-  // value line (least-squares) when the x axis is a price
-  if (xm.costlike && pts.length > 3) {
-    const n = pts.length, sx = pts.reduce((a, p) => a + p.x, 0), sy = pts.reduce((a, p) => a + p.y, 0);
-    const sxx = pts.reduce((a, p) => a + p.x * p.x, 0), sxy = pts.reduce((a, p) => a + p.x * p.y, 0);
+  for (const t of yt) { const y = Y(t); g += '<line class="grid" x1="' + M.l + '" y1="' + y.toFixed(1) + '" x2="' + (W - M.r) + '" y2="' + y.toFixed(1) + '"/>'; g += '<text class="tick" x="' + (M.l - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + fmtTick(t) + '</text>'; }
+  for (const t of xt) { const x = X(t); g += '<text class="tick" x="' + x.toFixed(1) + '" y="' + (H - M.b + 18) + '" text-anchor="middle">' + fmtTick(t) + '</text>'; }
+  // value line (least-squares over in-range points) when the x axis is a price
+  const inr = pts.filter(p => !over(p));
+  if (xm.costlike && inr.length > 3) {
+    const n = inr.length, sx = inr.reduce((a, p) => a + p.x, 0), sy = inr.reduce((a, p) => a + p.y, 0);
+    const sxx = inr.reduce((a, p) => a + p.x * p.x, 0), sxy = inr.reduce((a, p) => a + p.x * p.y, 0);
     const b = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1), a = (sy - b * sx) / n;
-    g += '<line class="vline" x1="' + X(xmin) + '" y1="' + Y(a + b * xmin).toFixed(1) + '" x2="' + X(xmax) + '" y2="' + Y(a + b * xmax).toFixed(1) + '"/>';
+    const y0 = Math.max(ymin, Math.min(ymax, a + b * xmin)), y1 = Math.max(ymin, Math.min(ymax, a + b * xmax));
+    g += '<line class="vline" x1="' + X(xmin) + '" y1="' + Y(y0).toFixed(1) + '" x2="' + X(xmax) + '" y2="' + Y(y1).toFixed(1) + '"/>';
   }
-  // points
+  // points; the rare unit beyond the axis range clamps to the edge as a hollow marker
+  let clamped = 0;
   for (const p of pts) {
-    const r = role(p.u), c = RCOL[r];
-    const tt = '<b>' + esc(p.u.n) + '</b><br>' + esc(p.u.f) + ' &middot; ' + r + '<br>' + ym.l + ': ' + fmtv(state.y, p.y) + '<br>' + xm.l + ': ' + fmtv(state.x, p.x);
-    g += '<circle cx="' + X(p.x).toFixed(1) + '" cy="' + Y(p.y).toFixed(1) + '" r="4.5" fill="' + c + '" fill-opacity="0.78" stroke="#fff8e8" stroke-width="0.6" data-s="' + p.u.s + '" data-t="' + tt.replace(/"/g, '&quot;') + '"/>';
+    const r = role(p.u), c = RCOL[r], cx = X(p.x), cy = Y(p.y), o = over(p);
+    if (o) clamped++;
+    const tt = '<b>' + esc(p.u.n) + '</b><br>' + esc(p.u.f) + ' &middot; ' + r + '<br>' + ym.l + ': ' + fmtv(state.y, p.y) + '<br>' + xm.l + ': ' + fmtv(state.x, p.x) + (o ? '<br><i>beyond axis range</i>' : '');
+    const data = ' data-s="' + p.u.s + '" data-t="' + tt.replace(/"/g, '&quot;') + '"';
+    if (o) g += '<path d="M' + cx.toFixed(1) + ' ' + (cy - 5).toFixed(1) + 'L' + (cx - 4.5).toFixed(1) + ' ' + (cy + 3.5).toFixed(1) + 'L' + (cx + 4.5).toFixed(1) + ' ' + (cy + 3.5).toFixed(1) + 'Z" fill="' + c + '" fill-opacity="0.25" stroke="' + c + '" stroke-width="1.3"' + data + '/>';
+    else g += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="4.5" fill="' + c + '" fill-opacity="0.78" stroke="#fff8e8" stroke-width="0.6"' + data + '/>';
   }
+  if (clamped) g += '<text class="tick" x="' + (W - M.r) + '" y="' + (M.t + 2) + '" text-anchor="end" fill="#856425">&#9650; ' + clamped + ' beyond range</text>';
   // axis titles
   g += '<text class="axislab" x="' + (M.l + iw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + xm.l + '</text>';
   g += '<text class="axislab" transform="translate(16,' + (M.t + ih / 2) + ') rotate(-90)" text-anchor="middle">' + ym.l + '</text>';
@@ -6203,14 +6230,14 @@ document.getElementById('legend').addEventListener('click', e => {
 });
 const plot = document.getElementById('plot'), tip = document.getElementById('tip');
 plot.addEventListener('mousemove', e => {
-  const c = e.target.closest('circle[data-s]');
+  const c = e.target.closest('[data-s]');
   if (!c) { tip.hidden = true; return; }
   tip.hidden = false; tip.innerHTML = c.getAttribute('data-t');
   tip.style.left = Math.min(e.clientX + 14, innerWidth - 250) + 'px';
   tip.style.top = (e.clientY + 14) + 'px';
 });
 plot.addEventListener('mouseleave', () => { tip.hidden = true; });
-plot.addEventListener('click', e => { const c = e.target.closest('circle[data-s]'); if (c) location.href = 'index.html#' + c.getAttribute('data-s'); });
+plot.addEventListener('click', e => { const c = e.target.closest('[data-s]'); if (c) location.href = 'index.html#' + c.getAttribute('data-s'); });
 draw();
 </script>
 </body>
