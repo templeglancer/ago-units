@@ -2349,6 +2349,22 @@ function buildHtml(model) {
   const projJson = JSON.stringify(model.projectiles);
   const mountJson = JSON.stringify(model.mounts);
   const patchJson = JSON.stringify(model.diffClient || { from: '', to: '', units: {} });
+  // radar axes: reference each unit's stat against the field's 95th percentile
+  // (computed over non-zero values so the many zeros don't drag the scale)
+  const pctile = (key) => {
+    const vals = model.units.map((u) => key === 'def' ? (u.armour + u.skill + u.shield)
+      : key === 'msl' ? (u.msl || 0) : (u[key] || 0)).filter((v) => v > 0).sort((a, b) => a - b);
+    if (!vals.length) return 1;
+    return vals[Math.min(vals.length - 1, Math.floor(vals.length * 0.95))] || vals[vals.length - 1];
+  };
+  const radarJson = JSON.stringify({ axes: [
+    { k: 'atk', label: 'Attack', max: pctile('atk') },
+    { k: 'chg', label: 'Charge', max: pctile('chg') },
+    { k: 'msl', label: 'Missile', max: pctile('msl') },
+    { k: 'def', label: 'Defence', max: pctile('def') },
+    { k: 'morale', label: 'Morale', max: pctile('morale') },
+    { k: 'men', label: 'Numbers', max: pctile('men') },
+  ] });
   const generated = new Date().toISOString().slice(0, 10);
 
   return `<!DOCTYPE html>
@@ -2614,6 +2630,12 @@ a.ref:hover { background: rgba(122,31,31,.08); }
 #cmp-bar button:disabled { opacity: .45; cursor: default; }
 #cmp-bar #cmp-clear { background: var(--parchment); color: var(--ink-soft); }
 .ref-box.wide { max-width: 920px; }
+.radar-wrap { text-align: center; margin: 6px 0 16px; }
+.radar-wrap svg { max-width: 100%; height: auto; }
+.radar-legend { margin-top: 2px; }
+.rleg { display: inline-block; margin: 0 12px 3px 0; font-size: 13.5px; }
+.rleg i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.radar-note { font-style: italic; color: var(--ink-soft); font-size: 12.5px; margin: 4px auto 0; max-width: 52ch; }
 .ref-box table th {
   font-family: var(--serif);
   font-size: 14.5px;
@@ -2721,6 +2743,7 @@ const FACTIONS = ${factionsJson};
 const PROJ = ${projJson};
 const MOUNTS = ${mountJson};
 const PATCH = ${patchJson};
+const RADAR = ${radarJson};
 // In-game soldier counts are the data-file numbers scaled by the unit-size
 // setting; this site shows Huge (x2.5), the scale the mod is balanced around.
 const SIZE_SCALE = 2.5;
@@ -3027,9 +3050,43 @@ function renderPins() {
   document.getElementById('cmp-go').disabled = pins.length < 2;
 }
 
+// up to four distinguishable inks for overlaid unit profiles
+const RC = ['#7c1d1d', '#a6822f', '#3a6038', '#3f5e8c'];
+function radarVal(u, k) {
+  if (k === 'def') return u.def;
+  if (k === 'msl') return u.msl || 0;
+  return u[k] || 0;
+}
+// an SVG spider chart overlaying the pinned units across six combat axes,
+// each scaled against the field's 95th-percentile so shapes are comparable
+function radarSvg(us) {
+  const ax = RADAR.axes, n = ax.length, cx = 165, cy = 158, R = 98;
+  const ang = i => (-90 + i * (360 / n)) * Math.PI / 180;
+  const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
+  let g = '';
+  for (const ring of [0.25, 0.5, 0.75, 1]) {
+    const pts = ax.map((_, i) => pt(i, R * ring).map(v => v.toFixed(1)).join(',')).join(' ');
+    g += '<polygon points="' + pts + '" fill="none" stroke="#cbb98d" stroke-width="' + (ring === 1 ? 1.2 : 0.6) + '"/>';
+  }
+  ax.forEach((a, i) => {
+    const [ex, ey] = pt(i, R);
+    g += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="#cbb98d" stroke-width="0.6"/>';
+    const [lx, ly] = pt(i, R + 16);
+    const anchor = Math.abs(lx - cx) < 8 ? 'middle' : (lx > cx ? 'start' : 'end');
+    g += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" text-anchor="' + anchor + '" font-size="11" letter-spacing="0.5" fill="#6c5a42" font-family="Cinzel, serif">' + a.label + '</text>';
+  });
+  us.forEach((u, ui) => {
+    const c = RC[ui % RC.length];
+    const pts = ax.map((a, i) => pt(i, R * Math.min(1, radarVal(u, a.k) / a.max)).map(v => v.toFixed(1)).join(',')).join(' ');
+    g += '<polygon points="' + pts + '" fill="' + c + '" fill-opacity="0.13" stroke="' + c + '" stroke-width="1.8" stroke-linejoin="round"/>';
+  });
+  const legend = us.map((u, ui) => '<span class="rleg"><i style="background:' + RC[ui % RC.length] + '"></i>' + esc(u.name) + '</span>').join('');
+  return '<div class="radar-wrap"><svg viewBox="0 0 330 300" width="330" height="300" role="img" aria-label="Combat profile radar comparison">' + g + '</svg><div class="radar-legend">' + legend + '</div><p class="radar-note">Each axis is scaled to the strongest units in the game, so the shape shows where a unit specialises.</p></div>';
+}
+
 function openCompare() {
   const us = pins.map(id => UNITS[id]);
-  let html = '<button class="ref-close">Close</button><span class="ref-kind">Side by side</span><h2>Comparison</h2><table>';
+  let html = '<button class="ref-close">Close</button><span class="ref-kind">Side by side</span><h2>Comparison</h2>' + radarSvg(us) + '<table>';
   html += '<tr><td></td>' + us.map(u =>
     '<th>' + (u.card ? '<img alt="" src="' + u.card + '">' : '') +
     '<a class="ref-unit" data-id="' + u.id + '">' + esc(u.name) + '</a></th>').join('') + '</tr>';
