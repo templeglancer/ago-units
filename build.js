@@ -2691,7 +2691,7 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -3557,7 +3557,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4084,7 +4084,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4492,7 +4492,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4905,7 +4905,7 @@ footer {
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5232,7 +5232,7 @@ footer {
 <header>
   <h1>AGO &mdash; Annals</h1>
   <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5495,7 +5495,7 @@ footer {
 <header>
   <h1>AGO &mdash; About</h1>
   <p class="sub">The mod, its makers and its history &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
 </header>
 
 <main>
@@ -5714,7 +5714,7 @@ footer {
 <header>
   <h1>AGO &mdash; Mechanics</h1>
   <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -5982,7 +5982,7 @@ footer {
 <header>
   <h1>AGO &mdash; Changes</h1>
   <p class="sub">${title}</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -5991,6 +5991,228 @@ ${body}
 </main>
 
 <footer>Generated ${generated} &middot; compared against the archived ${d ? esc(d.from) : 'previous'} snapshot</footer>
+</body>
+</html>
+`;
+}
+
+// ----------------------------------------------------------- analytics page
+
+function buildAnalyticsHtml(model) {
+  const aJson = JSON.stringify(model.units.filter((u) => (u.cost || 0) > 0).map((u) => ({
+    n: u.name, s: u.slug, f: u.faction, cat: u.category || '', msl: u.msl,
+    men: Math.round((u.men || 0) * 2.5), atk: u.atk || 0, chg: u.chg || 0,
+    def: (u.armour || 0) + (u.skill || 0) + (u.shield || 0), mor: u.morale || 0,
+    hp: u.hp || 1, cost: u.cost || 0, upkeep: u.upkeep || 0, turns: u.turns || 0,
+  })));
+  const generated = new Date().toISOString().slice(0, 10);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGO — Unit Analytics</title>
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+main { max-width: 1000px; margin: 0 auto; padding: 14px 14px 60px; }
+.lead { max-width: 78ch; margin: 0 auto 12px; text-align: center; color: var(--ink-soft); font-style: italic; }
+.controls .axis { font-family: var(--display); font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
+#plot { background: var(--panel); border: 1px solid var(--line-dark); border-radius: 4px; box-shadow: 0 2px 8px rgba(60,40,10,.12); }
+#plot svg { display: block; width: 100%; height: auto; }
+#plot circle { cursor: pointer; transition: r .1s ease; }
+#plot circle:hover { r: 7; }
+.axislab { font-family: var(--display); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; fill: var(--ink-soft); }
+.tick { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
+.grid { stroke: var(--line); stroke-width: .5; }
+.vline { stroke: var(--gold-deep); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.tip {
+  position: fixed; z-index: 60; pointer-events: none;
+  background: #2a201a; color: #f3ead2; border: 1px solid var(--gold-deep);
+  border-radius: 4px; padding: 6px 9px; font-size: 13px; max-width: 240px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.4);
+}
+.tip b { color: var(--gold-leaf); font-family: var(--display); letter-spacing: .03em; }
+.legend { text-align: center; margin: 10px 0 4px; }
+.lg { display: inline-block; margin: 0 10px 3px 0; font-size: 13px; cursor: pointer; user-select: none; }
+.lg.off { opacity: .35; }
+.lg i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle; margin-right: 5px; }
+h2.sec {
+  font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent); border-bottom: 2px solid var(--line-dark);
+  padding-bottom: 4px; margin: 30px 0 12px;
+}
+.boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px 22px; }
+.board h3 { font-family: var(--display); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-deep); margin: 0 0 5px; }
+.board ol { margin: 0; padding-left: 22px; }
+.board li { margin: 0 0 3px; }
+.board a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--line-dark); }
+.board a:hover { color: var(--accent); }
+.board .bv { float: right; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 30px; }
+@media (max-width: 620px) { main { padding: 8px 8px 60px; } }
+</style>
+<link href="site.css" rel="stylesheet">
+</head>
+<body>
+<header>
+  <h1>AGO &mdash; Unit Analytics</h1>
+  <p class="sub">Where every unit sits on the field &middot; value, power and specialism</p>
+  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html" class="active">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+</header>
+
+<div class="controls">
+  <span class="axis">Plot</span>
+  <select id="ysel"></select>
+  <span class="axis">against</span>
+  <select id="xsel"></select>
+  <select id="fac"><option value="">All factions</option></select>
+  <span class="catbtns" id="roles">
+    <button data-r="" class="active">All</button>
+    <button data-r="Infantry">Infantry</button>
+    <button data-r="Ranged">Ranged</button>
+    <button data-r="Cavalry">Cavalry</button>
+    <button data-r="Siege">Siege</button>
+    <button data-r="Ships">Ships</button>
+  </span>
+  <span class="count" id="count"></span>
+</div>
+
+<main>
+  <p class="lead">Each point is a recruitable unit. Plot any two stats against each other &mdash; with cost or upkeep on the bottom axis, a dashed value line is drawn: units above it give more for the gold, units below cost a premium. Hover a point for its name, click to open it. (Bodyguards and event-only units, which have no recruitment cost, are excluded.)</p>
+  <div id="plot"></div>
+  <div class="legend" id="legend"></div>
+
+  <h2 class="sec">Leaderboards</h2>
+  <div class="boards" id="boards"></div>
+  <div class="empty" id="empty" hidden>No units match these filters.</div>
+</main>
+
+<footer>Generated ${generated} &middot; value metrics weigh each stat by unit size; &ldquo;combat power&rdquo; = size &times; (best attack + &frac12; charge + &frac12; defence + &frac14; morale)</footer>
+
+<div id="tip" class="tip" hidden></div>
+
+<script>
+const AU = ${aJson};
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+const METRICS = {
+  power: { l: 'Combat power', f: u => u.men * (Math.max(u.atk, u.msl || 0) + 0.5 * u.chg + 0.5 * u.def + 0.25 * u.mor) },
+  cost: { l: 'Cost (gold)', f: u => u.cost, costlike: true },
+  upkeep: { l: 'Upkeep / turn', f: u => u.upkeep, costlike: true },
+  cps: { l: 'Cost per soldier', f: u => u.cost / u.men, dp: 1 },
+  av: { l: 'Attack value / 100g', f: u => u.atk * u.men / u.cost * 100 },
+  dv: { l: 'Defence value / 100g', f: u => u.def * u.men / u.cost * 100 },
+  atk: { l: 'Melee attack', f: u => u.atk },
+  chg: { l: 'Charge bonus', f: u => u.chg },
+  msl: { l: 'Missile attack', f: u => u.msl || 0 },
+  def: { l: 'Defence', f: u => u.def },
+  mor: { l: 'Morale', f: u => u.mor },
+  hp: { l: 'Hit points', f: u => u.hp },
+  men: { l: 'Soldiers', f: u => u.men },
+  turns: { l: 'Turns to train', f: u => u.turns },
+};
+const MORDER = ['power','cost','upkeep','cps','av','dv','atk','chg','msl','def','mor','hp','men','turns'];
+const RCOL = { Infantry: '#7c1d1d', Ranged: '#3a6038', Cavalry: '#3f5e8c', Siege: '#a6822f', Ships: '#5a4a6a' };
+function role(u){ if(u.cat==='ship')return 'Ships'; if(u.cat==='siege')return 'Siege'; if(u.cat==='cavalry')return 'Cavalry'; if(u.msl!=null)return 'Ranged'; return 'Infantry'; }
+const state = { x: 'cost', y: 'power', fac: '', role: '', off: {} };
+
+const $x = document.getElementById('xsel'), $y = document.getElementById('ysel'), $fac = document.getElementById('fac');
+for (const k of MORDER) {
+  $x.appendChild(new Option(METRICS[k].l, k));
+  $y.appendChild(new Option(METRICS[k].l, k));
+}
+$x.value = state.x; $y.value = state.y;
+for (const f of [...new Set(AU.map(u => u.f))].sort()) $fac.appendChild(new Option(f, f));
+
+function visible(){ return AU.filter(u => (!state.fac || u.f === state.fac) && (!state.role || role(u) === state.role) && !state.off[role(u)]); }
+function fmtv(k, v){ const m = METRICS[k]; return (m.dp ? v.toFixed(m.dp) : Math.round(v)) + (k === 'cost' || k === 'cps' || k === 'upkeep' ? 'g' : ''); }
+
+function niceTicks(min, max){
+  const span = max - min || 1, step = Math.pow(10, Math.floor(Math.log10(span / 4)));
+  const err = span / 4 / step, mult = err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+  const s = mult * step, lo = Math.floor(min / s) * s, ticks = [];
+  for (let t = lo; t <= max + s * .5; t += s) if (t >= min - s * .5) ticks.push(t);
+  return ticks;
+}
+
+function draw(){
+  const us = visible();
+  const xm = METRICS[state.x], ym = METRICS[state.y];
+  const pts = us.map(u => ({ u, x: xm.f(u), y: ym.f(u) })).filter(p => isFinite(p.x) && isFinite(p.y));
+  document.getElementById('count').textContent = pts.length + ' of ' + AU.length + ' units';
+  document.getElementById('empty').hidden = pts.length > 0;
+  if (!pts.length) { document.getElementById('plot').innerHTML = ''; document.getElementById('boards').innerHTML = ''; return; }
+  const W = 760, H = 470, M = { l: 72, r: 22, t: 18, b: 54 }, iw = W - M.l - M.r, ih = H - M.t - M.b;
+  let xmin = Math.min(...pts.map(p => p.x)), xmax = Math.max(...pts.map(p => p.x));
+  let ymin = Math.min(...pts.map(p => p.y)), ymax = Math.max(...pts.map(p => p.y));
+  if (xm.costlike || state.x === 'men' || state.x === 'cps') xmin = Math.min(xmin, 0);
+  ymin = Math.min(ymin, 0);
+  if (xmax === xmin) xmax += 1; if (ymax === ymin) ymax += 1;
+  const xt = niceTicks(xmin, xmax), yt = niceTicks(ymin, ymax);
+  xmin = Math.min(xmin, xt[0]); xmax = Math.max(xmax, xt[xt.length - 1]);
+  ymin = Math.min(ymin, yt[0]); ymax = Math.max(ymax, yt[yt.length - 1]);
+  const X = v => M.l + (v - xmin) / (xmax - xmin) * iw;
+  const Y = v => M.t + ih - (v - ymin) / (ymax - ymin) * ih;
+  let g = '';
+  // grid + ticks
+  for (const t of yt) { const y = Y(t); g += '<line class="grid" x1="' + M.l + '" y1="' + y.toFixed(1) + '" x2="' + (W - M.r) + '" y2="' + y.toFixed(1) + '"/>'; g += '<text class="tick" x="' + (M.l - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + (Math.abs(t) >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + 'k' : Math.round(t)) + '</text>'; }
+  for (const t of xt) { const x = X(t); g += '<text class="tick" x="' + x.toFixed(1) + '" y="' + (H - M.b + 18) + '" text-anchor="middle">' + (Math.abs(t) >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + 'k' : Math.round(t)) + '</text>'; }
+  // value line (least-squares) when the x axis is a price
+  if (xm.costlike && pts.length > 3) {
+    const n = pts.length, sx = pts.reduce((a, p) => a + p.x, 0), sy = pts.reduce((a, p) => a + p.y, 0);
+    const sxx = pts.reduce((a, p) => a + p.x * p.x, 0), sxy = pts.reduce((a, p) => a + p.x * p.y, 0);
+    const b = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1), a = (sy - b * sx) / n;
+    g += '<line class="vline" x1="' + X(xmin) + '" y1="' + Y(a + b * xmin).toFixed(1) + '" x2="' + X(xmax) + '" y2="' + Y(a + b * xmax).toFixed(1) + '"/>';
+  }
+  // points
+  for (const p of pts) {
+    const r = role(p.u), c = RCOL[r];
+    const tt = '<b>' + esc(p.u.n) + '</b><br>' + esc(p.u.f) + ' &middot; ' + r + '<br>' + ym.l + ': ' + fmtv(state.y, p.y) + '<br>' + xm.l + ': ' + fmtv(state.x, p.x);
+    g += '<circle cx="' + X(p.x).toFixed(1) + '" cy="' + Y(p.y).toFixed(1) + '" r="4.5" fill="' + c + '" fill-opacity="0.78" stroke="#fff8e8" stroke-width="0.6" data-s="' + p.u.s + '" data-t="' + tt.replace(/"/g, '&quot;') + '"/>';
+  }
+  // axis titles
+  g += '<text class="axislab" x="' + (M.l + iw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + xm.l + '</text>';
+  g += '<text class="axislab" transform="translate(16,' + (M.t + ih / 2) + ') rotate(-90)" text-anchor="middle">' + ym.l + '</text>';
+  document.getElementById('plot').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Unit scatter plot">' + g + '</svg>';
+
+  // legend (clickable to mute a role)
+  document.getElementById('legend').innerHTML = Object.keys(RCOL).map(r =>
+    '<span class="lg' + (state.off[r] ? ' off' : '') + '" data-r="' + r + '"><i style="background:' + RCOL[r] + '"></i>' + r + '</span>').join('');
+
+  // leaderboards (respect filters)
+  const BOARDS = [['Best melee value', 'av'], ['Best defence value', 'dv'], ['Highest combat power', 'power'], ['Cheapest per soldier', 'cps', true], ['Highest morale', 'mor'], ['Strongest charge', 'chg']];
+  document.getElementById('boards').innerHTML = BOARDS.map(([lab, k, asc]) => {
+    const arr = us.filter(u => isFinite(METRICS[k].f(u))).sort((a, b) => (METRICS[k].f(b) - METRICS[k].f(a)) * (asc ? -1 : 1)).slice(0, 8);
+    return '<div class="board"><h3>' + lab + '</h3><ol>' + arr.map(u =>
+      '<li><a href="index.html#' + u.s + '">' + esc(u.n) + '</a> <span class="bv">' + fmtv(k, METRICS[k].f(u)) + '</span></li>').join('') + '</ol></div>';
+  }).join('');
+}
+
+$x.addEventListener('change', e => { state.x = e.target.value; draw(); });
+$y.addEventListener('change', e => { state.y = e.target.value; draw(); });
+$fac.addEventListener('change', e => { state.fac = e.target.value; draw(); });
+document.getElementById('roles').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.role = b.dataset.r;
+  for (const x of document.querySelectorAll('#roles button')) x.classList.toggle('active', x === b);
+  draw();
+});
+document.getElementById('legend').addEventListener('click', e => {
+  const s = e.target.closest('.lg'); if (!s) return;
+  const r = s.dataset.r; state.off[r] = !state.off[r]; draw();
+});
+const plot = document.getElementById('plot'), tip = document.getElementById('tip');
+plot.addEventListener('mousemove', e => {
+  const c = e.target.closest('circle[data-s]');
+  if (!c) { tip.hidden = true; return; }
+  tip.hidden = false; tip.innerHTML = c.getAttribute('data-t');
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - 250) + 'px';
+  tip.style.top = (e.clientY + 14) + 'px';
+});
+plot.addEventListener('mouseleave', () => { tip.hidden = true; });
+plot.addEventListener('click', e => { const c = e.target.closest('circle[data-s]'); if (c) location.href = 'index.html#' + c.getAttribute('data-s'); });
+draw();
+</script>
 </body>
 </html>
 `;
@@ -6035,6 +6257,8 @@ console.log(`Annals page: ${model.annals.events.length} event scrolls, ${model.a
 writePage(path.join(__dirname, 'mechanics.html'), buildMechanicsHtml(model));
 writePage(path.join(__dirname, 'about.html'), buildAboutHtml());
 console.log('About page: credits rendered.');
+writePage(path.join(__dirname, 'analytics.html'), buildAnalyticsHtml(model));
+console.log('Analytics page: scatter + leaderboards over ' + model.units.filter((u) => (u.cost || 0) > 0).length + ' recruitable units.');
 writePage(path.join(__dirname, 'changes.html'), buildChangesHtml(model));
 console.log(model.diff
   ? `Changes page: ${model.diff.changed.length} changed, ${model.diff.added.length} added, ${model.diff.removed.length} removed (${model.diff.from} -> ${model.diff.to}).`
