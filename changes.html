@@ -80,9 +80,17 @@ h3.fac {
 .uname { font-weight: 600; color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
 .uname:hover { background: rgba(122,31,31,.08); }
 .deltas { margin-top: 2px; }
-.pchg { display: inline-block; margin: 0 14px 3px 0; white-space: nowrap; font-size: 14px; }
-.pchg.up { color: var(--good); }
-.pchg.down { color: var(--bad); }
+.pchg {
+  display: inline-block;
+  margin: 0 8px 5px 0;
+  white-space: nowrap;
+  font-size: 13.5px;
+  padding: 2px 9px;
+  border-radius: 11px;
+  border: 1px solid currentColor;
+}
+.pchg.up { color: var(--good); background: rgba(58,96,56,.09); }
+.pchg.down { color: var(--bad); background: rgba(138,37,37,.08); }
 .ulist { max-width: 80ch; line-height: 1.9; }
 .ulist a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
 .ulist.removed { color: var(--ink-soft); }
@@ -103,6 +111,7 @@ footer {
   main { padding: 8px 10px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>

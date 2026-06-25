@@ -2358,7 +2358,6 @@ function buildHtml(model) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AGO — Unit Compendium</title>
 <link href="fonts/fonts.css" rel="stylesheet">
-<link href="site.css" rel="stylesheet">
 <style>
 main { max-width: 1280px; margin: 0 auto; padding: 12px 14px 60px; }
 table { width: 100%; border-collapse: collapse; }
@@ -2444,9 +2443,9 @@ tr.faction-row td .fcount { color: var(--ink-soft); font-size: 12px; letter-spac
   color: var(--gold);
   margin-bottom: 4px;
 }
-.patchline .pchg { display: inline-block; margin: 0 12px 3px 0; white-space: nowrap; }
-.patchline .pchg.up { color: #2f5d31; }
-.patchline .pchg.down { color: #8a2525; }
+.patchline .pchg { display: inline-block; margin: 0 7px 4px 0; white-space: nowrap; padding: 1px 8px; border-radius: 10px; border: 1px solid currentColor; font-size: 12.5px; }
+.patchline .pchg.up { color: var(--good); background: rgba(58,96,56,.09); }
+.patchline .pchg.down { color: var(--bad); background: rgba(138,37,37,.08); }
 tr.detail td {
   background: #faf3df;
   border: 1px solid var(--line-dark);
@@ -2655,6 +2654,7 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
   .detail-stats td:first-child { width: 90px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -2686,17 +2686,17 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
       <tr>
         <th data-k="name">Unit <span class="arrow"></span></th>
         <th data-k="men" class="num" title="In-game soldier count at Huge unit size (data value &times;2.5)">Men <span class="arrow"></span></th>
-        <th data-k="atk" class="num">Atk <span class="arrow"></span></th>
-        <th data-k="chg" class="num hide-sm">Chg <span class="arrow"></span></th>
-        <th data-k="msl" class="num">Msl <span class="arrow"></span></th>
-        <th data-k="rng" class="num hide-sm">Rng <span class="arrow"></span></th>
-        <th data-k="ammo" class="num hide-sm">Ammo <span class="arrow"></span></th>
-        <th data-k="def" class="num">Def <span class="arrow"></span></th>
-        <th data-k="morale" class="num hide-xs">Mor <span class="arrow"></span></th>
-        <th data-k="hp" class="num hide-sm">HP <span class="arrow"></span></th>
-        <th data-k="cost" class="num">Cost <span class="arrow"></span></th>
-        <th data-k="upkeep" class="num hide-xs">Upkeep <span class="arrow"></span></th>
-        <th data-k="turns" class="num hide-sm">Turns <span class="arrow"></span></th>
+        <th data-k="atk" class="num" title="Melee attack">Atk <span class="arrow"></span></th>
+        <th data-k="chg" class="num hide-sm" title="Charge bonus — added to attack on impact">Chg <span class="arrow"></span></th>
+        <th data-k="msl" class="num" title="Missile attack (ranged units)">Msl <span class="arrow"></span></th>
+        <th data-k="rng" class="num hide-sm" title="Missile range">Rng <span class="arrow"></span></th>
+        <th data-k="ammo" class="num hide-sm" title="Shots per soldier">Ammo <span class="arrow"></span></th>
+        <th data-k="def" class="num" title="Total defence = armour + defence skill + shield">Def <span class="arrow"></span></th>
+        <th data-k="morale" class="num hide-xs" title="Morale — how long they stand before routing">Mor <span class="arrow"></span></th>
+        <th data-k="hp" class="num hide-sm" title="Hit points per soldier">HP <span class="arrow"></span></th>
+        <th data-k="cost" class="num" title="Recruitment cost in gold">Cost <span class="arrow"></span></th>
+        <th data-k="upkeep" class="num hide-xs" title="Upkeep per turn">Upkeep <span class="arrow"></span></th>
+        <th data-k="turns" class="num hide-sm" title="Turns to train">Turns <span class="arrow"></span></th>
       </tr>
     </thead>
     <tbody id="rows"></tbody>
@@ -3477,6 +3477,7 @@ footer {
   .lvl { flex-direction: row; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -4003,6 +4004,7 @@ footer {
   main { padding: 8px 6px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -4410,6 +4412,7 @@ footer {
   main { padding: 8px 6px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -4822,6 +4825,7 @@ footer {
   main { padding: 8px 6px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -5148,6 +5152,7 @@ footer {
   main { padding: 8px 6px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -5410,6 +5415,7 @@ footer {
   main { padding: 8px 10px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -5628,6 +5634,7 @@ footer {
   main { padding: 8px 10px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -5864,9 +5871,17 @@ h3.fac {
 .uname { font-weight: 600; color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
 .uname:hover { background: rgba(122,31,31,.08); }
 .deltas { margin-top: 2px; }
-.pchg { display: inline-block; margin: 0 14px 3px 0; white-space: nowrap; font-size: 14px; }
-.pchg.up { color: var(--good); }
-.pchg.down { color: var(--bad); }
+.pchg {
+  display: inline-block;
+  margin: 0 8px 5px 0;
+  white-space: nowrap;
+  font-size: 13.5px;
+  padding: 2px 9px;
+  border-radius: 11px;
+  border: 1px solid currentColor;
+}
+.pchg.up { color: var(--good); background: rgba(58,96,56,.09); }
+.pchg.down { color: var(--bad); background: rgba(138,37,37,.08); }
 .ulist { max-width: 80ch; line-height: 1.9; }
 .ulist a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
 .ulist.removed { color: var(--ink-soft); }
@@ -5887,6 +5902,7 @@ footer {
   main { padding: 8px 10px 60px; }
 }
 </style>
+<link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
