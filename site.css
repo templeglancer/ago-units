@@ -1,0 +1,276 @@
+/* AGO Compendium — shared design system.
+   "The Red Book": an illuminated-manuscript hierarchy built from two scribal
+   tools — rubrication (red ink for headings) and gilding (gold for initials
+   and rules) — on vellum. Linked by every page; page-specific rules live in
+   each page's own <style>. */
+
+:root {
+  /* vellum ground */
+  --parchment: #f1e7cf;
+  --parchment-dark: #e7dabb;
+  --panel: #fbf5e4;          /* card / raised surface */
+  --row-alt: #ece0c4;
+  /* ink */
+  --ink: #28201a;
+  --ink-soft: #6c5a42;
+  /* rubric (red ink) — headings & interaction */
+  --accent: #7c1d1d;
+  --accent-soft: rgba(124, 29, 29, .10);
+  /* gilt (gold leaf) — initials, rules, marks */
+  --gold: #a6822f;
+  --gold-leaf: #c4a04a;
+  --gold-deep: #856425;
+  /* structural lines */
+  --line: #cbb98d;
+  --line-dark: #ab9362;
+  /* semantic, muted into the palette */
+  --good: #3a6038;
+  --bad: #8a2525;
+  --serif: 'EB Garamond', Garamond, 'Palatino Linotype', 'Book Antiqua', serif;
+  --display: Cinzel, 'Trajan Pro', 'Palatino Linotype', serif;
+  --ctrlh: 49px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background-color: var(--parchment);
+  background-image:
+    radial-gradient(ellipse at top, rgba(255,252,240,.55), transparent 62%),
+    radial-gradient(ellipse at bottom, rgba(120,90,40,.12), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(120,90,40,.022) 0 2px, transparent 2px 4px);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+/* ----------------------------------------------------- illuminated masthead */
+header {
+  position: relative;
+  text-align: center;
+  padding: 30px 16px 16px;
+  background: linear-gradient(var(--parchment-dark), var(--parchment));
+  border-bottom: 1px solid var(--gold-deep);
+  box-shadow: 0 1px 0 var(--gold-leaf), 0 3px 0 -1px var(--parchment), 0 4px 0 -1px var(--line-dark);
+}
+header h1 {
+  position: relative;
+  display: inline-block;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(26px, 4vw, 38px);
+  letter-spacing: .14em;
+  margin: 0;
+  /* gold-leaf fill with an engraved edge */
+  color: var(--gold-deep);
+  background: linear-gradient(176deg, #d8b766 0%, var(--gold-leaf) 38%, var(--gold-deep) 70%, #b8923a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 1px 0 rgba(255,250,235,.4);
+  filter: drop-shadow(0 1px 0 rgba(60,40,10,.25));
+}
+/* gold rules that draw themselves in on either side of the title */
+header h1::before, header h1::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: clamp(20px, 9vw, 90px);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-leaf), var(--gold-deep));
+  transform: scaleX(0);
+  animation: ruleIn .9s ease .15s forwards;
+}
+header h1::before { right: 100%; margin-right: 22px; transform-origin: right center; }
+header h1::after { left: 100%; margin-left: 22px; background: linear-gradient(90deg, var(--gold-deep), var(--gold-leaf), transparent); transform-origin: left center; }
+@keyframes ruleIn { to { transform: scaleX(1); } }
+header .sub {
+  font-style: italic;
+  color: var(--ink-soft);
+  margin: 8px 0 0;
+  font-size: 16.5px;
+}
+
+/* ------------------------------------------------------------------- navbar */
+.sitenav {
+  margin: 14px 0 0;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 4px;
+}
+.sitenav a {
+  position: relative;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 4px 12px;
+  border-radius: 3px;
+  transition: color .18s ease, background .18s ease;
+}
+/* hover: a gilt underline draws in from the centre */
+.sitenav a::after {
+  content: "";
+  position: absolute;
+  left: 12px; right: 12px; bottom: 2px;
+  height: 1.5px;
+  background: var(--gold-leaf);
+  transform: scaleX(0);
+  transition: transform .2s ease;
+}
+.sitenav a:hover { color: var(--accent); }
+.sitenav a:hover::after { transform: scaleX(1); }
+/* active page: an inked rubric stamp */
+.sitenav a.active {
+  color: #f6eeda;
+  background: var(--accent);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35), 0 1px 0 rgba(255,250,235,.4);
+}
+.sitenav a.active::after { display: none; }
+
+/* ------------------------------------------------------------ control strip */
+.controls {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: var(--parchment-dark);
+  border-bottom: 1px solid var(--gold-deep);
+  box-shadow: 0 2px 7px rgba(60,40,10,.16);
+}
+.controls label {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.controls input[type=search], .controls select {
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line-dark);
+  border-radius: 3px;
+  padding: 5px 9px;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.controls input[type=search] { width: 230px; }
+.controls input[type=search]:focus, .controls select:focus {
+  outline: none;
+  border-color: var(--gold-deep);
+  box-shadow: 0 0 0 2px rgba(196,160,74,.35);
+}
+.catbtns { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--line-dark); border-radius: 3px; overflow: hidden; }
+.catbtns button {
+  font-family: var(--display);
+  font-size: 11.5px;
+  letter-spacing: .05em;
+  padding: 5px 11px;
+  background: var(--panel);
+  border: none;
+  border-right: 1px solid var(--line);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, transform .06s ease;
+}
+.catbtns button:last-child { border-right: none; }
+.catbtns button:hover { background: #f3e9cf; color: var(--accent); }
+.catbtns button:active { transform: translateY(1px); }
+/* selected filter: pressed inked stamp */
+.catbtns button.active {
+  background: var(--accent);
+  color: #f6eeda;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.4);
+}
+.count { font-style: italic; color: var(--ink-soft); font-size: 14px; }
+
+/* --------------------------------------------------------- shared fragments */
+.dim { color: var(--ink-soft); font-size: 12.5px; }
+.badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-family: var(--display);
+  letter-spacing: .04em;
+  border: 1px solid var(--gold);
+  color: var(--gold-deep);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
+.badge.eop { border-color: var(--accent); color: var(--accent); }
+.badge.upd { border-color: var(--gold-leaf); color: var(--gold-deep); background: rgba(196,160,74,.12); }
+
+/* a rubricated section head: gilt pilcrow + red ink small caps */
+.rubric {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.rubric::before {
+  content: "\00B6";
+  color: var(--gold-leaf);
+  margin-right: .5em;
+  font-weight: 700;
+}
+
+/* a gilt drop-cap for the opening of a prose passage */
+.dropcap::first-letter {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 3.1em;
+  line-height: .82;
+  float: left;
+  margin: 6px 8px 0 0;
+  color: var(--gold-deep);
+  background: linear-gradient(170deg, var(--gold-leaf), var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* a card / raised panel that lifts gently on hover */
+.lift { transition: transform .16s ease, box-shadow .16s ease; }
+.lift:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(60,40,10,.22); }
+
+/* cross-page links */
+a.x { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+a.x:hover { background: var(--accent-soft); }
+a.bldlink { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--line-dark); }
+a.bldlink:hover { color: var(--accent); }
+
+/* ------------------------------------------------------------------ footer */
+footer {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 16px 14px;
+  margin-top: 10px;
+  border-top: 1px solid var(--gold-deep);
+  box-shadow: 0 -1px 0 var(--gold-leaf);
+}
+footer code { font-style: normal; font-family: Consolas, monospace; font-size: 12.5px; }
+#lq { margin-top: 7px; max-width: 70ch; margin-left: auto; margin-right: auto; }
+
+/* ----------------------------------------------------------- accessibility */
+:focus-visible { outline: 2px solid var(--gold-deep); outline-offset: 2px; border-radius: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  header h1::before, header h1::after { transform: scaleX(1); }
+}
