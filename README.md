@@ -2,8 +2,12 @@
 
 Live at **https://agocompendium.com** (GitHub Pages behind Cloudflare).
 
-A self-contained website displaying every unit in the AGO mod, with names,
-descriptions, and battle stats merged from the mod's data files. Companion
+A self-contained website. The homepage **index.html** is an archive-hall
+portal — a hero, a unit search, and section cards into every part of the
+site (old `index.html#unit-slug` / `?faction=` links redirect to units.html
+so shared bookmarks keep working). **units.html** is the unit compendium
+itself (every unit's names, descriptions and battle stats merged from the
+mod's data files, with table and war-card views). Companion
 pages: **buildings.html** (every building chain and guild, with a settlement
 tech-tree view), **factions.html** (campaign overviews and questlines for all
 26 playable factions), **characters.html** (every visible character trait

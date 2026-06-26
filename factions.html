@@ -186,7 +186,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main id="main"></main>
@@ -206,7 +206,7 @@ function esc(s) {
 
 function tierLine(list) {
   return list.map(u => u.s
-    ? '<a class="unitlink" href="index.html#' + u.s + '">' + esc(u.n) + '</a>'
+    ? '<a class="unitlink" href="units.html#' + u.s + '">' + esc(u.n) + '</a>'
     : esc(u.n)).join(', ');
 }
 
@@ -327,7 +327,7 @@ function cardHtml(f) {
       (f.low.length ? '<h3>Early units</h3><p>' + tierLine(f.low) + '</p>' : '') +
       (f.mid.length ? '<h3>Mid-tier units</h3><p>' + tierLine(f.mid) + '</p>' : '') +
       (f.high.length ? '<h3>Elite units</h3><p>' + tierLine(f.high) + '</p>' : '') +
-      '<a class="roster" href="index.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
+      '<a class="roster" href="units.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
       '</div></div>' + questsHtml(f) + loreHtml(f) + '</div>';
   }
   const SC = { good: '#3a6038', evil: '#7c1d1d', neutral: '#a6822f' };

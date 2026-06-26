@@ -159,7 +159,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -253,7 +253,7 @@ function heroDetail(e) {
     parts.push('<div class="lfx"><b>Dread</b>' + e.dread + ' (terrifies nearby foes)</div>');
     if (e.ability) parts.push('<div class="lfx"><b>Battle ability</b>' + esc(e.ability) + '</div>');
     if (e.unitRef) parts.push('<div class="lfx"><b>Bodyguard</b>' +
-      (e.unitRef.slug ? '<a class="unitlink" href="index.html#' + e.unitRef.slug + '">' + esc(e.unitRef.name) + '</a>' : esc(e.unitRef.name)) + '</div>');
+      (e.unitRef.slug ? '<a class="unitlink" href="units.html#' + e.unitRef.slug + '">' + esc(e.unitRef.name) + '</a>' : esc(e.unitRef.name)) + '</div>');
     if (e.traits.length) parts.push('<div class="lfx"><b>Traits</b>' + e.traits.map(t => clink(t) + ' <span class="dim">' + t.v + '</span>').join(', ') + '</div>');
     if (e.ancs.length) parts.push('<div class="lfx"><b>Relics</b>' + e.ancs.map(clink).join(', ') + '</div>');
     if (e.respawn) parts.push('<div class="lfx"><b>Death</b>returns after ' + e.respawn + ' turns unless the One Ring is destroyed</div>');

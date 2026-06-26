@@ -25,7 +25,7 @@ const OUT_FHTML = path.join(__dirname, 'factions.html');
 const OUT_FPICS = path.join(__dirname, 'factionpics');
 const CARD_DIR = path.join(MOD_ROOT, 'data', 'ui', 'units', 'mercs');
 const PORTRAIT_DIR = path.join(MOD_ROOT, 'data', 'ui', 'unit_info', 'merc');
-const OUT_HTML = path.join(__dirname, 'index.html');
+const OUT_HTML = path.join(__dirname, 'units.html');
 const OUT_BHTML = path.join(__dirname, 'buildings.html');
 const OUT_PORTRAITS = path.join(__dirname, 'portraits');
 const OUT_CARDS = path.join(__dirname, 'cards');
@@ -2765,7 +2765,7 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html" class="active">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html" class="active">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -2846,9 +2846,12 @@ UNITS.forEach((u, i) => { u.id = i; u.def = u.armour + u.skill + u.shield; });
 
 const state = { q: '', faction: '', cat: '', sortKey: null, sortDir: 1, view: 'table', open: new Set() };
 
-// ?faction=<name> pre-selects the faction filter (used by the factions page)
+// ?faction=<name> pre-selects the faction filter (used by the factions page);
+// ?q=<term> pre-fills the search (used by the homepage portal search box)
 const qpFaction = new URLSearchParams(location.search).get('faction');
 if (qpFaction && FACTIONS.includes(qpFaction)) state.faction = qpFaction;
+const qpQ = new URLSearchParams(location.search).get('q');
+if (qpQ) state.q = qpQ.trim();
 
 // Keep the sticky column header just below the (wrapping) control bar.
 const setCtrlH = () => document.documentElement.style.setProperty('--ctrlh',
@@ -2865,6 +2868,7 @@ for (const f of FACTIONS) {
   $faction.appendChild(o);
 }
 if (state.faction) $faction.value = state.faction;
+if (state.q) document.getElementById('q').value = state.q;
 
 function unitCat(u) {
   if (u.category === 'ship' || u.shipType) return 'ship';
@@ -3716,7 +3720,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -3830,7 +3834,7 @@ function lvlPic(l) { return (state.fac && l.pics[state.fac]) || l.pic; }
 function lvlVisible(l) { return !state.fac || !l.facs.length || l.facs.includes(state.fac); }
 
 function recruitLink(r) {
-  return (r.s ? '<a class="unitlink" href="index.html#' + r.s + '">' + esc(r.n) + '</a>' : esc(r.n)) +
+  return (r.s ? '<a class="unitlink" href="units.html#' + r.s + '">' + esc(r.n) + '</a>' : esc(r.n)) +
     (r.exp ? ' <span class="dim">+' + r.exp + ' exp</span>' : '');
 }
 
@@ -4248,7 +4252,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4268,7 +4272,7 @@ function esc(s) {
 
 function tierLine(list) {
   return list.map(u => u.s
-    ? '<a class="unitlink" href="index.html#' + u.s + '">' + esc(u.n) + '</a>'
+    ? '<a class="unitlink" href="units.html#' + u.s + '">' + esc(u.n) + '</a>'
     : esc(u.n)).join(', ');
 }
 
@@ -4389,7 +4393,7 @@ function cardHtml(f) {
       (f.low.length ? '<h3>Early units</h3><p>' + tierLine(f.low) + '</p>' : '') +
       (f.mid.length ? '<h3>Mid-tier units</h3><p>' + tierLine(f.mid) + '</p>' : '') +
       (f.high.length ? '<h3>Elite units</h3><p>' + tierLine(f.high) + '</p>' : '') +
-      '<a class="roster" href="index.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
+      '<a class="roster" href="units.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
       '</div></div>' + questsHtml(f) + loreHtml(f) + '</div>';
   }
   const SC = { good: '#3a6038', evil: '#7c1d1d', neutral: '#a6822f' };
@@ -4667,7 +4671,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4761,7 +4765,7 @@ function heroDetail(e) {
     parts.push('<div class="lfx"><b>Dread</b>' + e.dread + ' (terrifies nearby foes)</div>');
     if (e.ability) parts.push('<div class="lfx"><b>Battle ability</b>' + esc(e.ability) + '</div>');
     if (e.unitRef) parts.push('<div class="lfx"><b>Bodyguard</b>' +
-      (e.unitRef.slug ? '<a class="unitlink" href="index.html#' + e.unitRef.slug + '">' + esc(e.unitRef.name) + '</a>' : esc(e.unitRef.name)) + '</div>');
+      (e.unitRef.slug ? '<a class="unitlink" href="units.html#' + e.unitRef.slug + '">' + esc(e.unitRef.name) + '</a>' : esc(e.unitRef.name)) + '</div>');
     if (e.traits.length) parts.push('<div class="lfx"><b>Traits</b>' + e.traits.map(t => clink(t) + ' <span class="dim">' + t.v + '</span>').join(', ') + '</div>');
     if (e.ancs.length) parts.push('<div class="lfx"><b>Relics</b>' + e.ancs.map(clink).join(', ') + '</div>');
     if (e.respawn) parts.push('<div class="lfx"><b>Death</b>returns after ' + e.respawn + ' turns unless the One Ring is destroyed</div>');
@@ -5080,7 +5084,7 @@ footer {
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5152,7 +5156,7 @@ function rowHtml(r) {
 }
 
 function ulink(u) {
-  return u.s ? '<a class="unitlink" href="index.html#' + u.s + '">' + esc(u.n) + '</a>' : esc(u.n);
+  return u.s ? '<a class="unitlink" href="units.html#' + u.s + '">' + esc(u.n) + '</a>' : esc(u.n);
 }
 
 function detailHtml(r) {
@@ -5407,7 +5411,7 @@ footer {
 <header>
   <h1>AGO &mdash; Annals</h1>
   <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5670,7 +5674,7 @@ footer {
 <header>
   <h1>AGO &mdash; About</h1>
   <p class="sub">The mod, its makers and its history &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
 </header>
 
 <main>
@@ -5889,7 +5893,7 @@ footer {
 <header>
   <h1>AGO &mdash; Mechanics</h1>
   <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -5905,7 +5909,7 @@ site shows. It is the one part of this site not read directly from the mod's fil
 
 <h3>Attack &amp; defence</h3>
 <p>Each strike rolls the attacker's <b>attack</b> against the defender's <b>defence</b>. Defence is the sum
-shown on the <a class="x" href="index.html">unit page</a>: armour&nbsp;+ defence skill&nbsp;+ shield. The three parts are not equal:
+shown on the <a class="x" href="units.html">unit page</a>: armour&nbsp;+ defence skill&nbsp;+ shield. The three parts are not equal:
 the <b>shield</b> only protects the front and left arc (attacks from the right or rear ignore it), and
 <b>defence skill</b> counts only in melee &mdash; missiles are resisted by armour and shield alone.</p>
 <h3>Armour-piercing</h3>
@@ -6035,14 +6039,14 @@ function buildChangesHtml(model) {
           return '<span class="pchg ' + (good ? 'up' : 'down') + '">' + esc(f.label) + ' ' +
             fnum(f.from) + ' &rarr; ' + fnum(f.to) + ' ' + arrow + '</span>';
         }).join('');
-        html += '<div class="urow"><a class="uname" href="index.html#' + c.slug + '">' + esc(c.name) + '</a>' +
+        html += '<div class="urow"><a class="uname" href="units.html#' + c.slug + '">' + esc(c.name) + '</a>' +
           '<div class="deltas">' + deltas + '</div></div>';
       }
     }
     if (d.added.length) {
       html += '<h2>New units</h2><p class="ulist">' +
         d.added.slice().sort((a, b) => a.name.localeCompare(b.name))
-          .map(u => '<a href="index.html#' + u.slug + '">' + esc(u.name) + '</a> <span class="dim">' + esc(u.faction) + '</span>').join(' &middot; ') +
+          .map(u => '<a href="units.html#' + u.slug + '">' + esc(u.name) + '</a> <span class="dim">' + esc(u.faction) + '</span>').join(' &middot; ') +
         '</p>';
     }
     if (d.removed.length) {
@@ -6180,7 +6184,7 @@ footer {
 <header>
   <h1>AGO &mdash; Changes</h1>
   <p class="sub">${title}</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -6256,7 +6260,7 @@ h2.sec {
 <header>
   <h1>AGO &mdash; Unit Analytics</h1>
   <p class="sub">Where every unit sits on the field &middot; value, power and specialism</p>
-  <nav class="sitenav"><a href="index.html">Units</a><a href="analytics.html" class="active">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html" class="active">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -6409,7 +6413,7 @@ function draw(){
   document.getElementById('boards').innerHTML = BOARDS.map(([lab, k, asc]) => {
     const arr = us.filter(u => isFinite(METRICS[k].f(u))).sort((a, b) => (METRICS[k].f(b) - METRICS[k].f(a)) * (asc ? -1 : 1)).slice(0, 8);
     return '<div class="board"><h3>' + lab + '</h3><ol>' + arr.map(u =>
-      '<li><a href="index.html#' + u.s + '">' + esc(u.n) + '</a> <span class="bv">' + fmtv(k, METRICS[k].f(u)) + '</span></li>').join('') + '</ol></div>';
+      '<li><a href="units.html#' + u.s + '">' + esc(u.n) + '</a> <span class="bv">' + fmtv(k, METRICS[k].f(u)) + '</span></li>').join('') + '</ol></div>';
   }).join('');
 }
 
@@ -6435,9 +6439,134 @@ plot.addEventListener('mousemove', e => {
   tip.style.top = (e.clientY + 14) + 'px';
 });
 plot.addEventListener('mouseleave', () => { tip.hidden = true; });
-plot.addEventListener('click', e => { const c = e.target.closest('[data-s]'); if (c) location.href = 'index.html#' + c.getAttribute('data-s'); });
+plot.addEventListener('click', e => { const c = e.target.closest('[data-s]'); if (c) location.href = 'units.html#' + c.getAttribute('data-s'); });
 draw();
 </script>
+</body>
+</html>
+`;
+}
+
+// ------------------------------------------------------------- homepage portal
+
+function buildPortalHtml(model) {
+  const ver = modVersion();
+  const generated = new Date().toISOString().slice(0, 10);
+  const ch = model.characters, w = model.world, an = model.annals, d = model.diff;
+  const ICON = {
+    units: 'M12 2 4 5v6c0 5.2 3.6 8.2 8 11 4.4-2.8 8-5.8 8-11V5z',
+    analytics: 'M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z',
+    factions: 'M5 3h13l-3 4 3 4H7v10H5z',
+    buildings: 'M7 22V8l5-4 5 4v14h-4v-5h-2v5z',
+    characters: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0z',
+    world: 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z',
+    annals: 'M7 4h10v13a3 3 0 0 1-3 3H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+    mechanics: 'M3 5c3-1 6-1 9 1v14c-3-2-6-2-9-1zM21 5c-3-1-6-1-9 1v14c3-2 6-2 9-1z',
+    changes: 'M8 3l4 5H9v6H7V8H4zM16 21l-4-5h3v-6h2v6h3z',
+  };
+  const cards = [
+    ['units.html', 'Units', model.units.length + ' units', 'Stats, recruitment and cost &mdash; table and war-card views', 'units'],
+    ['analytics.html', 'Analytics', 'value &amp; power', 'Cost-vs-power scatter, value frontier and leaderboards', 'analytics'],
+    ['factions.html', 'Factions', model.factionPages.length + ' factions', 'Rosters, questlines, victory goals and patch impact', 'factions'],
+    ['buildings.html', 'Buildings &amp; Guilds', model.buildings.length + ' chains', 'Tiers, effects, recruits and the settlement tech tree', 'buildings'],
+    ['characters.html', 'Characters', ch.traits.length + ' traits &middot; ' + ch.ancs.length + ' retinue', 'Trait ladders and triggers, the Nine, battle abilities', 'characters'],
+    ['regions.html', 'World', w.regions.length + ' provinces', 'Owners, faiths, garrisons, rebels and landmarks', 'world'],
+    ['annals.html', 'Annals', an.events.length + ' scrolls', 'Every campaign event and calamity, by faction', 'annals'],
+    ['mechanics.html', 'Mechanics', 'combat &amp; systems', 'Combat primer, the Ring, spycraft, raiding, settings', 'mechanics'],
+    ['changes.html', 'Changes', d ? d.changed.length + ' changed' : 'patch diff', 'What changed in the latest update, by faction', 'changes'],
+  ];
+  const cardHtml = cards.map(([href, title, count, desc, ic], i) =>
+    '<a class="pcard" href="' + href + '" style="animation-delay:' + Math.min(i * 45, 360) + 'ms">' +
+    '<span class="pic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="' + ICON[ic] + '"/></svg></span>' +
+    '<span class="pt">' + title + '</span>' +
+    '<span class="pcount">' + count + '</span>' +
+    '<span class="pd">' + desc + '</span></a>').join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>/* keep old deep links working: bounce /#unit or /?faction=|?q= to the unit page */
+(function(){var h=location.hash,s=location.search;if(h||/[?&](faction|q)=/.test(s))location.replace('units.html'+s+h);})();</scr` + `ipt>
+<title>AGO Compendium — Divide and Conquer: AGO field archive</title>
+<meta name="description" content="The complete data field guide for the Divide and Conquer: AGO mod — units, factions, buildings, characters, regions, events, mechanics and patch changes, generated from the mod files.">
+<link href="fonts/fonts.css" rel="stylesheet">
+<style>
+main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
+.phero { text-align: center; padding: 18px 0 8px; }
+.phero .tagline { font-size: 18px; color: var(--ink-soft); font-style: italic; margin: 0 auto 14px; max-width: 60ch; }
+.cred { font-family: var(--display); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-deep); margin: 0 0 18px; }
+.cred b { color: var(--ink-soft); font-weight: 600; }
+.psearch { margin: 0 auto 8px; max-width: 540px; display: flex; gap: 8px; }
+.psearch input {
+  flex: 1; font-family: var(--serif); font-size: 17px; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line-dark); border-radius: 4px; padding: 10px 14px;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.psearch input:focus { outline: none; border-color: var(--gold-deep); box-shadow: 0 0 0 2px rgba(196,160,74,.35); }
+.psearch button {
+  font-family: var(--display); font-size: 13px; letter-spacing: .04em; cursor: pointer;
+  background: var(--accent); color: #f6eeda; border: 1px solid var(--accent); border-radius: 4px; padding: 0 18px;
+  box-shadow: inset 0 1px 0 rgba(255,250,235,.18);
+}
+.psearch button:active { transform: translateY(1px); }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 16px; margin: 26px 0 8px; }
+.pcard {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--panel); border: 1px solid var(--line-dark); border-top: 3px solid var(--gold);
+  border-radius: 5px; padding: 18px 18px 16px; box-shadow: 0 1px 3px rgba(60,40,10,.14);
+  opacity: 0; transform: translateY(10px); animation: pcardIn .5s ease forwards;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+@keyframes pcardIn { to { opacity: 1; transform: none; } }
+.pcard:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(60,40,10,.26); border-top-color: var(--gold-leaf); }
+.pcard .pic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%; margin-bottom: 11px;
+  background: radial-gradient(circle at 35% 30%, #f7eccb, #e7d3a0); color: var(--gold-deep);
+  border: 1px solid var(--gold);
+}
+.pcard .pic svg { width: 24px; height: 24px; }
+.pcard .pt { display: block; font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: .04em; color: var(--accent); }
+.pcard .pcount { display: block; font-size: 13px; color: var(--gold-deep); font-variant-numeric: tabular-nums; margin: 1px 0 6px; }
+.pcard .pd { display: block; font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
+.pchanges {
+  margin: 26px auto 0; max-width: 620px; text-align: center;
+  background: var(--parchment-dark); border: 1px solid var(--line-dark); border-radius: 5px; padding: 14px 18px;
+}
+.pchanges h2 { font-family: var(--display); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
+.pchanges a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+.pchanges .nums { font-size: 15px; }
+.pchanges .nums b { font-variant-numeric: tabular-nums; }
+@media (max-width: 620px) { main { padding: 6px 10px 60px; } .psearch { flex-direction: column; } .psearch button { padding: 9px; } }
+</style>
+<link href="site.css" rel="stylesheet">
+</head>
+<body>
+<header>
+  <h1>AGO Compendium</h1>
+  <p class="sub">The complete field archive for Divide and Conquer: AGO</p>
+  <nav class="sitenav"><a href="index.html" class="active">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+</header>
+
+<main>
+  <section class="phero">
+    <p class="tagline">A data field guide to every host, hold and chronicle of Middle-earth in the AGO mod.</p>
+    <p class="cred">Generated from the mod files &middot; Version <b>${ver}</b> &middot; Built <b>${generated}</b></p>
+    <form class="psearch" action="units.html" method="get" role="search">
+      <input type="search" name="q" placeholder="Search the unit roster&hellip;" aria-label="Search units" autocomplete="off">
+      <button type="submit">Search</button>
+    </form>
+  </section>
+
+  <div class="pgrid">${cardHtml}</div>
+
+  ${d ? `<section class="pchanges"><h2>Latest update &mdash; ${d.from} to ${d.to}</h2>` +
+    `<p class="nums"><b>${d.changed.length}</b> units changed &middot; <b>${d.added.length}</b> added &middot; <b>${d.removed.length}</b> removed &mdash; <a href="changes.html">see the war report &rarr;</a></p></section>` : ''}
+</main>
+
+<footer>An independent data reference, generated from the AGO mod files &middot; <a class="x" href="about.html">about this site</a></footer>
 </body>
 </html>
 `;
@@ -6470,6 +6599,7 @@ const withQuote = (html) => loreQuotes.length
   : html;
 const writePage = (file, html) => fs.writeFileSync(file, withQuote(html), 'utf8');
 
+writePage(path.join(__dirname, 'index.html'), buildPortalHtml(model));
 writePage(OUT_HTML, buildHtml(model));
 writePage(OUT_BHTML, buildBuildingsHtml(model));
 writePage(OUT_FHTML, buildFactionsHtml(model));
