@@ -2405,6 +2405,28 @@ thead th {
 thead th:hover { color: #fff; }
 thead th .arrow { font-size: 10px; color: var(--gold-leaf); }
 thead th.num { text-align: right; }
+/* column zone bands above the headers */
+thead .grouprow th {
+  font-family: var(--display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--gold-leaf);
+  background: #322619;
+  border: 1px solid #2c2013;
+  border-bottom: none;
+  padding: 5px 6px 3px;
+  text-align: center;
+}
+thead .grouprow .gg-id { background: #3b2d1d; }
+/* faint zone tints, composited over the row stripes */
+tbody td:nth-child(n+3):nth-child(-n+7) { background: rgba(124,29,29,.05); }
+tbody td:nth-child(n+8):nth-child(-n+10) { background: rgba(64,84,96,.06); }
+tbody td:nth-child(n+11) { background: rgba(166,130,47,.07); }
+/* quiet the secondary columns (Men, Chg, Rng, Ammo, HP) so key stats lead */
+tbody td:nth-child(2), tbody td:nth-child(4), tbody td:nth-child(6),
+tbody td:nth-child(7), tbody td:nth-child(10) { color: var(--ink-soft); }
 tbody td {
   padding: 4px 7px;
   border: 1px solid var(--line);
@@ -2771,6 +2793,12 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
   <div id="cards" hidden></div>
   <table id="tbl">
     <thead>
+      <tr class="grouprow">
+        <th colspan="2" class="gg-id"></th>
+        <th colspan="5" class="gg-com">Combat</th>
+        <th colspan="3" class="gg-def">Defence</th>
+        <th colspan="3" class="gg-eco">Economy</th>
+      </tr>
       <tr>
         <th data-k="name">Unit <span class="arrow"></span></th>
         <th data-k="men" class="num" title="In-game soldier count at Huge unit size (data value &times;2.5)">Men <span class="arrow"></span></th>
@@ -3156,7 +3184,7 @@ document.getElementById('cards').addEventListener('error', (e) => {
 }, true);
 document.querySelector('thead').addEventListener('click', (e) => {
   const th = e.target.closest('th');
-  if (!th) return;
+  if (!th || !th.dataset.k) return;
   const k = th.dataset.k;
   if (state.sortKey === k) {
     if (state.sortDir === -1) { state.sortKey = null; state.sortDir = 1; } // third click: back to faction grouping
@@ -4105,12 +4133,17 @@ h2.side.good { color: var(--good); }
 h2.side.evil { color: var(--bad); }
 .fcard {
   border: 1px solid var(--line-dark);
+  border-left: 4px solid var(--sc, var(--line-dark));
   border-radius: 3px;
   background: var(--parchment);
   margin: 0 0 10px;
   cursor: pointer;
+  transition: background .15s ease, transform .16s ease, box-shadow .16s ease;
 }
-.fcard:hover { background: #efe6cd; }
+/* scroll-reveal: base state is visible, so content never hides if JS is off */
+.fcard.in { animation: riseIn .5s ease; }
+@keyframes riseIn { from { opacity: .001; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.fcard:not(.open):hover { background: #efe6cd; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(60,40,10,.16); }
 .fcard.open { background: #f7f0dd; cursor: default; }
 .fhead { display: flex; align-items: center; gap: 14px; padding: 8px 14px; }
 .fhead img { width: 44px; height: 44px; object-fit: contain; flex: none; }
@@ -4359,13 +4392,23 @@ function cardHtml(f) {
       '<a class="roster" href="index.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
       '</div></div>' + questsHtml(f) + loreHtml(f) + '</div>';
   }
-  return '<div class="fcard' + (open.has(f.id) ? ' open' : '') + '" data-id="' + f.id + '">' +
+  const SC = { good: '#3a6038', evil: '#7c1d1d', neutral: '#a6822f' };
+  return '<div class="fcard' + (open.has(f.id) ? ' open in' : '') + '" data-id="' + f.id + '" style="--sc:' + (SC[f.side] || '#8a6d2f') + '">' +
     '<div class="fhead">' +
     (f.sym ? '<img alt="" src="' + f.sym + '">' : '') +
     '<div><div class="fname">' + esc(f.name) + '</div>' +
     (meta ? '<div class="fmeta">' + esc(meta) + '</div>' : '') + '</div>' +
     '<div class="fnum">' + c.total + ' units</div>' +
     '</div>' + body + '</div>';
+}
+
+// reveal faction cards as they scroll into view (base state stays visible)
+const revealIO = ('IntersectionObserver' in window)
+  ? new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); revealIO.unobserve(e.target); } }, { rootMargin: '0px 0px -8% 0px' })
+  : null;
+function applyReveal() {
+  if (!revealIO) return;
+  for (const el of document.querySelectorAll('.fcard:not(.in)')) revealIO.observe(el);
 }
 
 function render() {
@@ -4378,6 +4421,7 @@ function render() {
     html += group.map(cardHtml).join('');
   }
   document.getElementById('main').innerHTML = html;
+  applyReveal();
 }
 
 document.getElementById('main').addEventListener('click', (e) => {
@@ -5956,6 +6000,24 @@ function buildChangesHtml(model) {
       '<b>' + d.changed.length + '</b> units changed &middot; ' +
       '<b>' + d.added.length + '</b> added &middot; ' +
       '<b>' + d.removed.length + '</b> removed</p>';
+    // faction impact: tally improving vs worsening stat changes per faction
+    const impact = {};
+    for (const c of d.changed) {
+      const im = impact[c.faction] || (impact[c.faction] = { buff: 0, nerf: 0 });
+      for (const f of c.fields) {
+        const up = (f.to === null ? -1 : f.to) - (f.from === null ? -1 : f.from);
+        if (up === 0) continue;
+        if (f.lower ? up < 0 : up > 0) im.buff += 1; else im.nerf += 1;
+      }
+    }
+    const rows = Object.entries(impact).sort((a, b) => (b[1].buff + b[1].nerf) - (a[1].buff + a[1].nerf));
+    if (rows.length) {
+      html += '<h2>Faction impact</h2><table class="impact"><tr><th>Faction</th><th class="num">Buffs</th><th class="num">Nerfs</th></tr>' +
+        rows.map(([fac, im]) => '<tr><td>' + esc(fac) + '</td>' +
+          '<td class="num">' + (im.buff ? '<span class="pchg up">&#9650; ' + im.buff + '</span>' : '<span class="z">&mdash;</span>') + '</td>' +
+          '<td class="num">' + (im.nerf ? '<span class="pchg down">&#9660; ' + im.nerf + '</span>' : '<span class="z">&mdash;</span>') + '</td></tr>').join('') +
+        '</table>';
+    }
     if (d.changed.length) {
       html += '<h2>Changed units</h2>';
       let lastFac = null;
@@ -6087,6 +6149,11 @@ h3.fac {
 }
 .pchg.up { color: var(--good); background: rgba(58,96,56,.09); }
 .pchg.down { color: var(--bad); background: rgba(138,37,37,.08); }
+table.impact { border-collapse: collapse; margin: 4px 0 8px; min-width: 280px; }
+table.impact th { font-family: var(--display); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); text-align: left; padding: 4px 16px 4px 0; border-bottom: 2px solid var(--line-dark); }
+table.impact th.num, table.impact td.num { text-align: right; }
+table.impact td { padding: 4px 16px 4px 0; border-bottom: 1px solid var(--line); }
+table.impact .z { color: var(--line-dark); }
 .ulist { max-width: 80ch; line-height: 1.9; }
 .ulist a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
 .ulist.removed { color: var(--ink-soft); }

@@ -30,6 +30,28 @@ thead th {
 thead th:hover { color: #fff; }
 thead th .arrow { font-size: 10px; color: var(--gold-leaf); }
 thead th.num { text-align: right; }
+/* column zone bands above the headers */
+thead .grouprow th {
+  font-family: var(--display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--gold-leaf);
+  background: #322619;
+  border: 1px solid #2c2013;
+  border-bottom: none;
+  padding: 5px 6px 3px;
+  text-align: center;
+}
+thead .grouprow .gg-id { background: #3b2d1d; }
+/* faint zone tints, composited over the row stripes */
+tbody td:nth-child(n+3):nth-child(-n+7) { background: rgba(124,29,29,.05); }
+tbody td:nth-child(n+8):nth-child(-n+10) { background: rgba(64,84,96,.06); }
+tbody td:nth-child(n+11) { background: rgba(166,130,47,.07); }
+/* quiet the secondary columns (Men, Chg, Rng, Ammo, HP) so key stats lead */
+tbody td:nth-child(2), tbody td:nth-child(4), tbody td:nth-child(6),
+tbody td:nth-child(7), tbody td:nth-child(10) { color: var(--ink-soft); }
 tbody td {
   padding: 4px 7px;
   border: 1px solid var(--line);
@@ -396,6 +418,12 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
   <div id="cards" hidden></div>
   <table id="tbl">
     <thead>
+      <tr class="grouprow">
+        <th colspan="2" class="gg-id"></th>
+        <th colspan="5" class="gg-com">Combat</th>
+        <th colspan="3" class="gg-def">Defence</th>
+        <th colspan="3" class="gg-eco">Economy</th>
+      </tr>
       <tr>
         <th data-k="name">Unit <span class="arrow"></span></th>
         <th data-k="men" class="num" title="In-game soldier count at Huge unit size (data value &times;2.5)">Men <span class="arrow"></span></th>
@@ -781,7 +809,7 @@ document.getElementById('cards').addEventListener('error', (e) => {
 }, true);
 document.querySelector('thead').addEventListener('click', (e) => {
   const th = e.target.closest('th');
-  if (!th) return;
+  if (!th || !th.dataset.k) return;
   const k = th.dataset.k;
   if (state.sortKey === k) {
     if (state.sortDir === -1) { state.sortKey = null; state.sortDir = 1; } // third click: back to faction grouping

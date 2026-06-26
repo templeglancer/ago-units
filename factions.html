@@ -71,12 +71,17 @@ h2.side.good { color: var(--good); }
 h2.side.evil { color: var(--bad); }
 .fcard {
   border: 1px solid var(--line-dark);
+  border-left: 4px solid var(--sc, var(--line-dark));
   border-radius: 3px;
   background: var(--parchment);
   margin: 0 0 10px;
   cursor: pointer;
+  transition: background .15s ease, transform .16s ease, box-shadow .16s ease;
 }
-.fcard:hover { background: #efe6cd; }
+/* scroll-reveal: base state is visible, so content never hides if JS is off */
+.fcard.in { animation: riseIn .5s ease; }
+@keyframes riseIn { from { opacity: .001; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.fcard:not(.open):hover { background: #efe6cd; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(60,40,10,.16); }
 .fcard.open { background: #f7f0dd; cursor: default; }
 .fhead { display: flex; align-items: center; gap: 14px; padding: 8px 14px; }
 .fhead img { width: 44px; height: 44px; object-fit: contain; flex: none; }
@@ -325,13 +330,23 @@ function cardHtml(f) {
       '<a class="roster" href="index.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
       '</div></div>' + questsHtml(f) + loreHtml(f) + '</div>';
   }
-  return '<div class="fcard' + (open.has(f.id) ? ' open' : '') + '" data-id="' + f.id + '">' +
+  const SC = { good: '#3a6038', evil: '#7c1d1d', neutral: '#a6822f' };
+  return '<div class="fcard' + (open.has(f.id) ? ' open in' : '') + '" data-id="' + f.id + '" style="--sc:' + (SC[f.side] || '#8a6d2f') + '">' +
     '<div class="fhead">' +
     (f.sym ? '<img alt="" src="' + f.sym + '">' : '') +
     '<div><div class="fname">' + esc(f.name) + '</div>' +
     (meta ? '<div class="fmeta">' + esc(meta) + '</div>' : '') + '</div>' +
     '<div class="fnum">' + c.total + ' units</div>' +
     '</div>' + body + '</div>';
+}
+
+// reveal faction cards as they scroll into view (base state stays visible)
+const revealIO = ('IntersectionObserver' in window)
+  ? new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); revealIO.unobserve(e.target); } }, { rootMargin: '0px 0px -8% 0px' })
+  : null;
+function applyReveal() {
+  if (!revealIO) return;
+  for (const el of document.querySelectorAll('.fcard:not(.in)')) revealIO.observe(el);
 }
 
 function render() {
@@ -344,6 +359,7 @@ function render() {
     html += group.map(cardHtml).join('');
   }
   document.getElementById('main').innerHTML = html;
+  applyReveal();
 }
 
 document.getElementById('main').addEventListener('click', (e) => {
