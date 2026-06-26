@@ -2673,6 +2673,52 @@ a.ref:hover { background: rgba(122,31,31,.08); }
 }
 tr.unit.flash td { animation: rowflash 1.6s ease-out; }
 @keyframes rowflash { 0% { background: #d8b86a; } 100% { background: var(--row-alt); } }
+/* war-card view */
+.cardband {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: linear-gradient(90deg, var(--parchment-dark), #f0e7cf 40%, var(--parchment-dark));
+  border: 1px solid var(--line-dark);
+  border-top: 2px solid var(--gold-deep);
+  padding: 7px 12px;
+  margin: 18px 0 12px;
+  text-align: center;
+}
+.cardband .fcount { color: var(--ink-soft); font-size: 12px; letter-spacing: .04em; margin-left: 8px; }
+.cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 15px; margin-bottom: 8px; }
+.warcard {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line-dark);
+  border-radius: 5px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(60,40,10,.16);
+  opacity: 0;
+  transform: translateY(10px);
+  animation: cardIn .5s ease forwards;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+@keyframes cardIn { to { opacity: 1; transform: none; } }
+.warcard:hover { transform: translateY(-4px); box-shadow: 0 10px 22px rgba(60,40,10,.3); border-color: var(--gold); }
+.warcard:focus-visible { outline: 2px solid var(--gold-deep); outline-offset: 2px; }
+.warcard .wc-strip { height: 4px; background: var(--rc); }
+.warcard .wc-img { display: block; width: 100%; height: 132px; object-fit: cover; object-position: center top; background: #2e2418; border-bottom: 1px solid var(--line); }
+.warcard .wc-ph { display: flex; align-items: center; justify-content: center; height: 132px; background: #efe6cd; border-bottom: 1px solid var(--line); }
+.warcard .wc-ph .wc-phi { width: 46px; height: 46px; opacity: .55; }
+.warcard .wc-body { padding: 8px 10px 11px; }
+.warcard .wc-name { font-family: var(--display); font-weight: 600; font-size: 14.5px; line-height: 1.16; display: flex; align-items: flex-start; gap: 6px; }
+.warcard .wc-name .ri { flex: none; width: 15px; height: 15px; margin-top: 1px; }
+.warcard .wc-name .ri svg { width: 15px; height: 15px; display: block; }
+.warcard .wc-sub { color: var(--ink-soft); font-size: 12.5px; font-style: italic; margin: 3px 0 8px; }
+.warcard .wc-stats { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 13.5px; font-variant-numeric: tabular-nums lining-nums; }
+.warcard .wc-stats b { font-family: var(--display); font-weight: 600; font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--gold-deep); margin-right: 3px; }
+.warcard .wc-tags { margin-top: 8px; line-height: 1.9; }
+.warcard .wc-tags .badge { margin-left: 0; margin-right: 4px; }
 @media (max-width: 900px) {
   .hide-sm { display: none; }
   .detail-inner { flex-direction: column; }
@@ -2714,10 +2760,15 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
     <button data-cat="siege">Siege</button>
     <button data-cat="ship">Ships</button>
   </span>
+  <span class="catbtns" id="views">
+    <button data-v="table" class="active">Table</button>
+    <button data-v="cards">War cards</button>
+  </span>
   <span class="count" id="count"></span>
 </div>
 
 <main>
+  <div id="cards" hidden></div>
   <table id="tbl">
     <thead>
       <tr>
@@ -2765,7 +2816,7 @@ const SIZE_SCALE = 2.5;
 const inGame = (n) => Math.round(n * SIZE_SCALE);
 UNITS.forEach((u, i) => { u.id = i; u.def = u.armour + u.skill + u.shield; });
 
-const state = { q: '', faction: '', cat: '', sortKey: null, sortDir: 1, open: new Set() };
+const state = { q: '', faction: '', cat: '', sortKey: null, sortDir: 1, view: 'table', open: new Set() };
 
 // ?faction=<name> pre-selects the faction filter (used by the factions page)
 const qpFaction = new URLSearchParams(location.search).get('faction');
@@ -2982,12 +3033,59 @@ function patchBlock(u) {
   return '<div class="patchline"><b>Changed in ' + PATCH.to + '</b>' + lines + '</div>';
 }
 
+// ---- War-card view: engraved role glyphs + parchment unit cards ----
+const ROLECOL = { infantry: '#7c1d1d', ranged: '#3a6038', cavalry: '#3f5e8c', siege: '#a6822f', ship: '#5a4a6a' };
+const ROLEICON = {
+  infantry: 'M12 2 4 5v6c0 5.2 3.6 8.2 8 11 4.4-2.8 8-5.8 8-11V5z',
+  cavalry: 'M4 5l7 7-7 7h3l7-7-7-7zM11 5l7 7-7 7h3l7-7-7-7z',
+  ranged: 'M12 2 5 11h4v11h6V11h4z',
+  siege: 'M12 2l1.8 5.4L19 5l-2.4 4.9L22 12l-5.4 1.8L19 19l-4.9-2.4L12 22l-1.8-5.4L5 19l2.4-4.9L2 12l5.4-1.8L5 5l4.9 2.4z',
+  ship: 'M3 16h18l-2.5 4.5h-13zM12 3l6 10h-6zM12 3 6 13h6z',
+};
+function roleOf(u) {
+  if (u.shipType || u.category === 'ship') return 'ship';
+  if (u.category === 'siege') return 'siege';
+  if (u.category === 'cavalry') return 'cavalry';
+  if (u.msl !== null) return 'ranged';
+  return 'infantry';
+}
+function roleSvg(r, cls) { return '<svg class="' + cls + '" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="' + ROLEICON[r] + '"/></svg>'; }
+
+function cardHtml(u, i) {
+  const r = roleOf(u), c = ROLECOL[r];
+  const img = u.pic ? '<img class="wc-img" loading="lazy" alt="" data-fb="' + u.id + '" src="' + u.pic + '">'
+    : u.card ? '<img class="wc-img" loading="lazy" alt="" src="' + u.card + '">'
+    : '<div class="wc-ph" style="color:' + c + '">' + roleSvg(r, 'wc-phi') + '</div>';
+  const tags = badges(u.meleeAttr) + (u.msl !== null ? badges(u.mslAttr) : '') +
+    (u.eop ? '<span class="badge eop" title="M2TWEOP addition">EOP</span>' : '') +
+    (PATCH.units[u.slug] ? '<span class="badge upd" title="Changed in ' + PATCH.to + '">&#916;</span>' : '');
+  const stat = (l, v) => (v === null || v === undefined || v === '') ? '' : '<span><b>' + l + '</b>' + v + '</span>';
+  return '<div class="warcard" data-id="' + u.id + '" style="--rc:' + c + ';animation-delay:' + Math.min(i * 18, 380) + 'ms">' +
+    '<div class="wc-strip"></div>' + img +
+    '<div class="wc-body"><div class="wc-name"><span class="ri" style="color:' + c + '">' + roleSvg(r, '') + '</span><span>' + esc(u.name) + '</span></div>' +
+    '<div class="wc-sub">' + esc(u.faction) + ' &middot; ' + typeLabel(u) + '</div>' +
+    '<div class="wc-stats">' + stat('Atk', fmt(u.atk)) + stat('Def', u.def) + stat('Mor', u.morale) + stat('Cost', u.cost) + '</div>' +
+    (tags ? '<div class="wc-tags">' + tags + '</div>' : '') +
+    '</div></div>';
+}
+function cardGrid(list) {
+  if (!list.length) return '';
+  if (state.sortKey) return '<div class="cardgrid">' + list.map((u, i) => cardHtml(u, Math.min(i, 28))).join('') + '</div>';
+  let html = '', cur = null, g = [];
+  const flush = () => {
+    if (!g.length) return;
+    html += '<div class="cardband">' + esc(cur) + '<span class="fcount">' + g.length + (g.length === 1 ? ' unit' : ' units') + '</span></div>';
+    html += '<div class="cardgrid">' + g.map((u, i) => cardHtml(u, Math.min(i, 28))).join('') + '</div>';
+  };
+  for (const u of list) { if (u.faction !== cur) { flush(); cur = u.faction; g = []; } g.push(u); }
+  flush();
+  return html;
+}
+
 function render() {
   const list = UNITS.filter(matches);
-  let html = '';
   if (state.sortKey) {
-    const k = state.sortKey;
-    const dir = state.sortDir;
+    const k = state.sortKey, dir = state.sortDir;
     list.sort((a, b) => {
       const av = a[k], bv = b[k];
       if (av === null && bv === null) return 0;
@@ -2996,14 +3094,18 @@ function render() {
       if (typeof av === 'string') return av.localeCompare(bv) * dir;
       return (av - bv) * dir;
     });
-    for (const u of list) {
-      html += rowHtml(u);
-      if (state.open.has(u.id)) html += detailHtml(u);
-    }
+  }
+  const cardsView = state.view === 'cards';
+  document.getElementById('tbl').hidden = cardsView;
+  document.getElementById('cards').hidden = !cardsView;
+  if (cardsView) {
+    document.getElementById('cards').innerHTML = cardGrid(list);
+    document.getElementById('rows').innerHTML = '';
   } else {
+    let html = '';
     let cur = null;
     for (const u of list) {
-      if (u.faction !== cur) {
+      if (!state.sortKey && u.faction !== cur) {
         cur = u.faction;
         const n = list.filter(x => x.faction === cur).length;
         html += '<tr class="faction-row"><td colspan="13">' + esc(cur) + '<span class="fcount">' + n + (n === 1 ? ' unit' : ' units') + '</span></td></tr>';
@@ -3011,8 +3113,8 @@ function render() {
       html += rowHtml(u);
       if (state.open.has(u.id)) html += detailHtml(u);
     }
+    document.getElementById('rows').innerHTML = html;
   }
-  document.getElementById('rows').innerHTML = html;
   document.getElementById('empty').hidden = list.length > 0;
   document.getElementById('count').textContent = list.length + ' of ' + UNITS.length + ' units';
   for (const th of document.querySelectorAll('thead th')) {
@@ -3029,6 +3131,29 @@ document.getElementById('cats').addEventListener('click', (e) => {
   for (const x of document.querySelectorAll('.catbtns button')) x.classList.toggle('active', x === b);
   render();
 });
+document.getElementById('views').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.view = b.dataset.v;
+  for (const x of document.querySelectorAll('#views button')) x.classList.toggle('active', x === b);
+  render();
+});
+// clicking a war card opens that unit in the table view
+document.getElementById('cards').addEventListener('click', (e) => {
+  const card = e.target.closest('.warcard');
+  if (!card) return;
+  const id = Number(card.dataset.id);
+  state.view = 'table';
+  for (const x of document.querySelectorAll('#views button')) x.classList.toggle('active', x.dataset.v === 'table');
+  state.open.add(id);
+  setHash(UNITS[id].slug);
+  render();
+  const row = document.querySelector('tr.unit[data-id="' + id + '"]');
+  if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
+});
+document.getElementById('cards').addEventListener('error', (e) => {
+  if (e.target instanceof HTMLImageElement) { e.target.outerHTML = '<div class="wc-ph"></div>'; }
+}, true);
 document.querySelector('thead').addEventListener('click', (e) => {
   const th = e.target.closest('th');
   if (!th) return;
