@@ -770,7 +770,7 @@ function render() {
   }
   document.getElementById('empty').hidden = list.length > 0;
   document.getElementById('count').textContent = list.length + ' of ' + UNITS.length + ' units';
-  for (const th of document.querySelectorAll('thead th')) {
+  for (const th of document.querySelectorAll('thead th[data-k]')) {
     th.querySelector('.arrow').textContent = th.dataset.k === state.sortKey ? (state.sortDir > 0 ? '\u25B4' : '\u25BE') : '';
   }
 }
