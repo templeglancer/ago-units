@@ -179,12 +179,17 @@ const DI = [{"n":"Fire","t":"A Great Fire","d":"A great fire","q":"'The land of 
 EV.forEach((e, i) => { e.id = i; });
 const state = { q: '', fac: '', open: new Set() };
 
+// ?q=<term> pre-fills the search (used by the global search on the homepage)
+const qpQ = new URLSearchParams(location.search).get('q');
+if (qpQ) { state.q = qpQ.trim(); }
+
 const $fac = document.getElementById('fac');
 for (const f of [...new Set(EV.map(e => e.f).filter(Boolean))].sort()) {
   const o = document.createElement('option');
   o.value = f; o.textContent = f;
   $fac.appendChild(o);
 }
+if (state.q) document.getElementById('q').value = state.q;
 
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

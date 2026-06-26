@@ -5436,12 +5436,17 @@ const DI = ${diJson};
 EV.forEach((e, i) => { e.id = i; });
 const state = { q: '', fac: '', open: new Set() };
 
+// ?q=<term> pre-fills the search (used by the global search on the homepage)
+const qpQ = new URLSearchParams(location.search).get('q');
+if (qpQ) { state.q = qpQ.trim(); }
+
 const $fac = document.getElementById('fac');
 for (const f of [...new Set(EV.map(e => e.f).filter(Boolean))].sort()) {
   const o = document.createElement('option');
   o.value = f; o.textContent = f;
   $fac.appendChild(o);
 }
+if (state.q) document.getElementById('q').value = state.q;
 
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -6447,6 +6452,30 @@ draw();
 `;
 }
 
+// ------------------------------------------------------------- global search
+// One combined index across every section, written to a standalone
+// search-index.js (window.AGO_SEARCH) that the portal lazy-loads on first
+// focus — keeps the homepage light and works offline (script, not fetch).
+function buildSearchIndex(model) {
+  const idx = [];
+  const push = (t, k, u, c) => { if (t) idx.push(c ? { t, k, u, c } : { t, k, u }); };
+  for (const u of model.units) push(u.name, 'Unit', 'units.html#' + u.slug, u.faction);
+  for (const f of model.factionPages) push(f.name, 'Faction', 'factions.html#' + f.slug,
+    f.side === 'good' ? 'Free Peoples' : f.side === 'evil' ? 'Shadow' : 'Neutral');
+  for (const b of model.buildings) push(b.name, 'Building', 'buildings.html#' + b.slug, b.cat);
+  for (const t of model.characters.traits) push(t.name, 'Trait', 'characters.html#' + t.slug, t.who);
+  for (const a of model.characters.ancs) push(a.name, 'Retinue', 'characters.html#' + a.slug, a.type);
+  for (const n of model.characters.nazgul) push(n.n, 'Hero', 'characters.html#' + n.slug, 'the Nazgûl');
+  for (const ab of model.characters.abilities) push(ab.n, 'Ability', 'characters.html#' + ab.slug, 'battle ability');
+  for (const r of model.world.regions) push(r.name, 'Province', 'regions.html#' + r.slug, r.owner);
+  for (const e of model.annals.events) push(e.t, 'Event', 'annals.html?q=' + encodeURIComponent(e.t), e.f || '');
+  for (const [t, a] of [['Combat', 'combat'], ['The One Ring', 'ring'], ['Palantíri', 'palantiri'],
+    ['Spy networks', 'spies'], ['Raiding', 'raiding'], ['Settings (AGO.cfg)', 'settings']]) {
+    push(t, 'Mechanics', 'mechanics.html#' + a, '');
+  }
+  return idx;
+}
+
 // ------------------------------------------------------------- homepage portal
 
 function buildPortalHtml(model) {
@@ -6512,6 +6541,7 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
 }
 .psearch button:active { transform: translateY(1px); }
 .pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 16px; margin: 26px 0 8px; }
+.pgrid[hidden] { display: none; }
 .pcard {
   display: block; text-decoration: none; color: inherit;
   background: var(--panel); border: 1px solid var(--line-dark); border-top: 3px solid var(--gold);
@@ -6539,6 +6569,15 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
 .pchanges a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
 .pchanges .nums { font-size: 15px; }
 .pchanges .nums b { font-variant-numeric: tabular-nums; }
+#results { margin: 24px 0 8px; }
+.rgroup { margin-bottom: 16px; }
+.rgroup h3 { font-family: var(--display); font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line-dark); padding-bottom: 3px; margin: 0 0 7px; }
+.rgroup h3 span { color: var(--ink-soft); font-weight: 400; }
+.rgroup a { display: inline-block; margin: 0 16px 6px 0; color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--line-dark); }
+.rgroup a:hover { color: var(--accent); }
+.rgroup a .rc { color: var(--ink-soft); font-size: 12.5px; font-style: italic; }
+.rgroup .rmore { color: var(--ink-soft); font-size: 13px; font-style: italic; }
+.nores { text-align: center; color: var(--ink-soft); font-style: italic; padding: 28px; }
 @media (max-width: 620px) { main { padding: 6px 10px 60px; } .psearch { flex-direction: column; } .psearch button { padding: 9px; } }
 </style>
 <link href="site.css" rel="stylesheet">
@@ -6555,11 +6594,12 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
     <p class="tagline">A data field guide to every host, hold and chronicle of Middle-earth in the AGO mod.</p>
     <p class="cred">Generated from the mod files &middot; Version <b>${ver}</b> &middot; Built <b>${generated}</b></p>
     <form class="psearch" action="units.html" method="get" role="search">
-      <input type="search" name="q" placeholder="Search the unit roster&hellip;" aria-label="Search units" autocomplete="off">
+      <input type="search" name="q" placeholder="Search units, factions, buildings, traits, regions, events&hellip;" aria-label="Search the compendium" autocomplete="off">
       <button type="submit">Search</button>
     </form>
   </section>
 
+  <div id="results" hidden></div>
   <div class="pgrid">${cardHtml}</div>
 
   ${d ? `<section class="pchanges"><h2>Latest update &mdash; ${d.from} to ${d.to}</h2>` +
@@ -6567,6 +6607,64 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
 </main>
 
 <footer>An independent data reference, generated from the AGO mod files &middot; <a class="x" href="about.html">about this site</a></footer>
+
+<script>
+(function () {
+  var input = document.querySelector('.psearch input');
+  var form = document.querySelector('.psearch');
+  var grid = document.querySelector('.pgrid');
+  var changes = document.querySelector('.pchanges');
+  var results = document.getElementById('results');
+  var INDEX = null, loading = false;
+  var KORDER = ['Unit', 'Faction', 'Building', 'Trait', 'Retinue', 'Hero', 'Ability', 'Province', 'Event', 'Mechanics'];
+  function esc(x) { return x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function load(cb) {
+    if (INDEX) { cb && cb(); return; }
+    if (loading) return;
+    loading = true;
+    var s = document.createElement('script');
+    s.src = 'search-index.js';
+    s.onload = function () { INDEX = window.AGO_SEARCH || []; cb && cb(); };
+    document.head.appendChild(s);
+  }
+  function run(raw) {
+    var q = raw.trim().toLowerCase();
+    if (q.length < 2) { results.hidden = true; results.innerHTML = ''; grid.hidden = false; if (changes) changes.hidden = false; return; }
+    if (!INDEX) { load(function () { run(input.value); }); return; }
+    var hits = [];
+    for (var i = 0; i < INDEX.length; i++) {
+      var e = INDEX[i], n = e.t.toLowerCase(), p = n.indexOf(q);
+      if (p < 0) continue;
+      hits.push([p === 0 ? 0 : (n.charAt(p - 1) === ' ' ? 1 : 2), e]);
+    }
+    hits.sort(function (a, b) { return a[0] - b[0] || a[1].t.length - b[1].t.length; });
+    grid.hidden = true; if (changes) changes.hidden = true; results.hidden = false;
+    if (!hits.length) { results.innerHTML = '<p class="nores">No matches for &ldquo;' + esc(raw.trim()) + '&rdquo;.</p>'; return; }
+    var byk = {};
+    for (var j = 0; j < hits.length; j++) { var x = hits[j][1]; (byk[x.k] = byk[x.k] || []).push(x); }
+    var html = '', SHOW = 8;
+    for (var ki = 0; ki < KORDER.length; ki++) {
+      var k = KORDER[ki], arr = byk[k];
+      if (!arr) continue;
+      html += '<div class="rgroup"><h3>' + k + ' <span>' + arr.length + '</span></h3>';
+      for (var m = 0; m < Math.min(arr.length, SHOW); m++) {
+        var it = arr[m];
+        html += '<a href="' + it.u + '">' + esc(it.t) + (it.c ? ' <span class="rc">' + esc(it.c) + '</span>' : '') + '</a>';
+      }
+      if (arr.length > SHOW) html += '<span class="rmore">+' + (arr.length - SHOW) + ' more</span>';
+      html += '</div>';
+    }
+    results.innerHTML = html;
+  }
+  input.addEventListener('focus', function () { load(); });
+  input.addEventListener('input', function () { run(input.value); });
+  input.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { input.value = ''; run(''); } });
+  form.addEventListener('submit', function (ev) {
+    var a = results.hidden ? null : results.querySelector('a');
+    if (a) { ev.preventDefault(); location.href = a.getAttribute('href'); }
+  });
+})();
+</script>
 </body>
 </html>
 `;
@@ -6599,6 +6697,8 @@ const withQuote = (html) => loreQuotes.length
   : html;
 const writePage = (file, html) => fs.writeFileSync(file, withQuote(html), 'utf8');
 
+fs.writeFileSync(path.join(__dirname, 'search-index.js'), 'window.AGO_SEARCH=' + JSON.stringify(buildSearchIndex(model)) + ';', 'utf8');
+console.log(`Search index: ${buildSearchIndex(model).length} entries.`);
 writePage(path.join(__dirname, 'index.html'), buildPortalHtml(model));
 writePage(OUT_HTML, buildHtml(model));
 writePage(OUT_BHTML, buildBuildingsHtml(model));

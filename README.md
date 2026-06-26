@@ -5,7 +5,11 @@ Live at **https://agocompendium.com** (GitHub Pages behind Cloudflare).
 A self-contained website. The homepage **index.html** is an archive-hall
 portal — a hero, a unit search, and section cards into every part of the
 site (old `index.html#unit-slug` / `?faction=` links redirect to units.html
-so shared bookmarks keep working). **units.html** is the unit compendium
+so shared bookmarks keep working). The portal search is a **global search**
+across every section (units, factions, buildings, traits, retinue, heroes,
+provinces, events, mechanics) — results grouped by kind, each linking to its
+entry; the index is a standalone `search-index.js` lazy-loaded on first
+focus (a script, not a fetch, so it works offline too). **units.html** is the unit compendium
 itself (every unit's names, descriptions and battle stats merged from the
 mod's data files, with table and war-card views). Companion
 pages: **buildings.html** (every building chain and guild, with a settlement
