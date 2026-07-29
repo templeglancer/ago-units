@@ -1,0 +1,13 @@
+{
+  "_comment": "EDU type names of content ported from the DaC EUR mod. These are kept out of the compendium website on purpose - the site documents AGO's own data only. Every unit (or other EDU entry) added by the EUR port must be listed here; build.js merges this list into EXCLUDE_UNITS automatically.",
+  "units": [
+    "Cardolan Men-at-Arms",
+    "Tharbad Tollkeepers",
+    "Eriador Protectors",
+    "tharbad_warhammer",
+    "Helevorn Pikemen",
+    "Alqualonde Accursed",
+    "Maglor Knights",
+    "Eregion Pikemen"
+  ]
+}

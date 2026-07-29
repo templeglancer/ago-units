@@ -32,11 +32,15 @@ player toggle with a description) and **about.html** (the mod team's credits). E
 loading-screen quote from the mod`s 850. **changes.html** lists every unit
 whose values changed in the latest update (old → new, with added/removed
 units), and changed units carry a Δ badge with an inline delta in their
-expanded view. **analytics.html** is a unit-stats dashboard: a configurable
-scatter (any stat vs any stat, with a least-squares value line when cost or
-upkeep is on the X axis), role colouring, faction/role filters, and
-value-for-gold leaderboards. The unit compare tray also overlays a stat
-radar and value-for-gold efficiency rows.
+expanded view. **rosters.html** answers "what can this faction field?": a
+role × price matrix for one faction at a time, where a hatched cell is a
+genuine hole in the roster. Availability is three bands — home recruitment
+(the default), units gated behind a province or a scripted event, and
+mercenaries — because most units are shared and a faction's reachable list
+is far longer than its starting army. Below the matrix, one scatter puts the
+faction's units against every other land unit on cost versus a single
+declared stat. The unit compare tray also overlays a stat radar and
+value-for-gold efficiency rows.
 
 ## Viewing
 

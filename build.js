@@ -40,8 +40,22 @@ const OUT_RHTML = path.join(__dirname, 'regions.html');
 const HISTEV_TXT = path.join(MOD_ROOT, 'data', 'text', 'historic_events.txt');
 const OUT_AHTML = path.join(__dirname, 'annals.html');
 // EDU type names (lowercased) to omit — the author's own custom units, which
-// don't belong in a compendium of the game's original data.
+// don't belong in a compendium of the game's original data. Content ported
+// from the EUR mod is excluded too, via the manifest kept next to this file
+// (eur-port-exclude.json); register every EUR-ported unit there.
 const EXCLUDE_UNITS = new Set(['guards of the fountain']);
+try {
+  const eurPort = JSON.parse(fs.readFileSync(path.join(__dirname, 'eur-port-exclude.json'), 'utf8'));
+  for (const t of eurPort.units || []) EXCLUDE_UNITS.add(t.trim().toLowerCase());
+} catch (e) {
+  console.warn('warning: eur-port-exclude.json not readable, EUR-ported units would appear on the site:', e.message);
+}
+// Hidden resources that describe terrain rather than territory. A pool gated on
+// one of these is still home recruitment — a coastal faction builds ships in its
+// own ports from turn one — unlike a pool gated on a named province, which means
+// "once you have taken somebody else's land".
+const TERRAIN_HR = new Set(['coast', 'boats', 'mountains', 'forest', 'grassland', 'barren', 'frozenlands']);
+
 const TRAITS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_character_traits.txt');
 const ANCS_TXT = path.join(MOD_ROOT, 'data', 'export_descr_ancillaries.txt');
 const VNVS_TXT = path.join(MOD_ROOT, 'data', 'text', 'export_VnVs.txt');
@@ -856,7 +870,11 @@ function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, gui
     if (!section) continue;
     const title = (cdesc[`imperial_campaign_${tag}_title`] || section).trim();
     const descr = cleanText(cdesc[key]);
-    const roster = units.filter((u) => u.faction === section);
+    // the units this faction can recruit with no province or event gate — NOT
+    // `u.faction`, which is only the EDU comment banner the unit was listed
+    // under (that read Gondor 39 where the real home roster is 33, and Umbar 21
+    // where it is 21 free of 118 reachable)
+    const roster = units.filter((u) => u.avail.free.includes(section));
     if (!roster.length) continue;
     const lua = facLua[tag] || { side: '', low: [], mid: [], high: [], capitals: [] };
     const counts = { total: roster.length, infantry: 0, cavalry: 0, ranged: 0, siege: 0, ships: 0 };
@@ -889,6 +907,9 @@ function buildFactionsModel(units, ownerMap, unitsByType, chains, buildings, gui
         slug: smChain ? smSlug : '',
         cname: smLvl ? (smLvl.names[section] || smLvl.name) : '',
       },
+      // the mod authors' own curated picks, straight from the faction Lua —
+      // not derivable from price bands, which is why the rosters page does not
+      // replace them
       low: linkify(lua.low), mid: linkify(lua.mid), high: linkify(lua.high),
       quests: overviews[tag] || [],
       lore: loreByTag[tag] || [],
@@ -2191,7 +2212,8 @@ function buildModel() {
     // that only differ by region or event conditions.
     const owner = [u.era0, ...(u.ownership || [])].find((o) => o && o !== 'slave');
     const culture = (owner && cultures[owner]) || '';
-    let pools = edb[u.type.trim().toLowerCase()] || [];
+    const allPools = edb[u.type.trim().toLowerCase()] || [];
+    let pools = allPools;
     if (owner) {
       const own = pools.filter((p) => p.facs.includes(owner));
       if (own.length) pools = own;
@@ -2218,6 +2240,38 @@ function buildModel() {
       .sort((a, b) => a.tier - b.tier || b.rate - a.rate)
       .map((e) => ({ ...e, max: Math.round(e.max * 10) / 10, hr: [...e.hr].slice(0, 4), ev: [...e.ev].slice(0, 2).map(prettyEvent) }));
     if (recruit.length) recruitable += 1;
+
+    // Who can actually field this unit. `faction` below is only the EDU comment
+    // banner it was listed under — most units are shared. A pool with no faction
+    // condition serves every owner of that building, which we flag rather than
+    // expand (resolving it needs the building's own ownership).
+    //
+    // `free` vs `gated` is the distinction the rosters page is built on: a pool
+    // with no positive gate is part of the faction's army from turn one, while
+    // one behind a hidden_resource or an event_counter is what it gets after
+    // taking somebody else's provinces. Collapsing the two puts 118 units on
+    // Umbar's page. condInfo() already dropped negated gates, so hr/ev being
+    // non-empty *is* the gate.
+    const freeTags = new Set();
+    const gatedTags = new Set();
+    let anyOwner = false;
+    for (const p of allPools) {
+      if (!p.facs.length) { anyOwner = true; continue; }
+      const gated = p.ev.length > 0 || p.hr.some((h) => !TERRAIN_HR.has(h));
+      const into = gated ? gatedTags : freeTags;
+      for (const f of p.facs) into.add(f);
+    }
+    const facNamesOf = (tags) => [...new Set([...tags].map((t) => ownerMap[t]).filter(Boolean))].sort();
+    const free = facNamesOf(freeTags);
+    const avail = {
+      free,
+      gated: facNamesOf(gatedTags).filter((f) => !free.includes(f)),
+      anyOwner,
+      // engine-level ownership, not recruitment — a faction can field these
+      // without any pool granting them (captured, scripted, inherited)
+      fielded: facNamesOf((u.ownership || []).filter((o) => o && o !== 'slave')),
+      merc: (u.attributes || []).includes('mercenary_unit'),
+    };
 
     // Mercenary pools: merge entries with identical terms, union their regions.
     const mPools = mercAll[u.type.trim().toLowerCase()] || [];
@@ -2291,6 +2345,7 @@ function buildModel() {
       moveSpeed: u.moveSpeed || 0,
       armourUg: u.armourUg || [],
       recruit,
+      avail,
       merc,
       eop: !!u.eop,
       card,
@@ -2343,6 +2398,7 @@ function buildModel() {
 
   return {
     units, factions, projectiles, mounts, buildings, factionPages, characters, world, annals, mechanics,
+    ownerMap,
     missingNames, missingCards, missingPortraits, eopCount: eop.length, recruitable, mercCount,
   };
 }
@@ -2350,7 +2406,9 @@ function buildModel() {
 // --------------------------------------------------------------------- html
 
 function buildHtml(model) {
-  const dataJson = JSON.stringify(model.units);
+  // `avail` is for the rosters page; nothing here reads it, and this payload is
+  // already the biggest on the site
+  const dataJson = JSON.stringify(model.units.map(({ avail, ...u }) => u));
   const factionsJson = JSON.stringify(model.factions);
   const projJson = JSON.stringify(model.projectiles);
   const mountJson = JSON.stringify(model.mounts);
@@ -2765,7 +2823,7 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html" class="active">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html" class="active">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -3720,7 +3778,7 @@ footer {
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4252,7 +4310,7 @@ footer {
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4388,12 +4446,13 @@ function cardHtml(f) {
         esc(h.n) + ' <span class="dim">(' + (h.r ? h.r + ', ' : '') + h.age + ')</span>' +
         (h.h ? '<span class="hstar" title="Carries a scripted battle ability">&#10022;</span>' : '')
       ).join(', ') + '</p>' : '') +
-      '<h3>Roster (' + c.total + ' units)</h3><p>' + breakdown + '</p>' +
       smithHtml(f) +
+      '<h3>Roster</h3><p>' + breakdown + '</p>' +
       (f.low.length ? '<h3>Early units</h3><p>' + tierLine(f.low) + '</p>' : '') +
       (f.mid.length ? '<h3>Mid-tier units</h3><p>' + tierLine(f.mid) + '</p>' : '') +
       (f.high.length ? '<h3>Elite units</h3><p>' + tierLine(f.high) + '</p>' : '') +
-      '<a class="roster" href="units.html?faction=' + encodeURIComponent(f.section) + '">View full roster &rarr;</a>' +
+      '<a class="roster" href="rosters.html?faction=' + encodeURIComponent(f.section) + '">' +
+        c.total + ' units by role and price &rarr;</a>' +
       '</div></div>' + questsHtml(f) + loreHtml(f) + '</div>';
   }
   const SC = { good: '#3a6038', evil: '#7c1d1d', neutral: '#a6822f' };
@@ -4671,7 +4730,7 @@ footer {
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5084,7 +5143,7 @@ footer {
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5411,7 +5470,7 @@ footer {
 <header>
   <h1>AGO &mdash; Annals</h1>
   <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5679,7 +5738,7 @@ footer {
 <header>
   <h1>AGO &mdash; About</h1>
   <p class="sub">The mod, its makers and its history &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
 </header>
 
 <main>
@@ -5898,7 +5957,7 @@ footer {
 <header>
   <h1>AGO &mdash; Mechanics</h1>
   <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -6189,7 +6248,7 @@ footer {
 <header>
   <h1>AGO &mdash; Changes</h1>
   <p class="sub">${title}</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -6203,15 +6262,55 @@ ${body}
 `;
 }
 
-// ----------------------------------------------------------- analytics page
+// ------------------------------------------------------------- rosters page
+// "What can this faction actually field?" — a role x price matrix, one faction
+// at a time. Availability is three bands, not one: a pool with no positive gate
+// is the faction's army from turn one, a gated one is what it gets after taking
+// somebody else's provinces (collapsing the two puts 118 units on Umbar's page),
+// and mercenaries are hired, not recruited.
+//
+// Rows are the EDU's own category x class. Inventing a row invents a gap: an
+// earlier cut had a "shock cavalry" row keyed off charge >= 12 and duly reported
+// that 15 factions had none, when AGO has no such concept at all.
 
-function buildAnalyticsHtml(model) {
-  const aJson = JSON.stringify(model.units.filter((u) => (u.cost || 0) > 0).map((u) => ({
-    n: u.name, s: u.slug, f: u.faction, cat: u.category || '', msl: u.msl,
-    men: Math.round((u.men || 0) * 2.5), atk: u.atk || 0, chg: u.chg || 0,
-    def: (u.armour || 0) + (u.skill || 0) + (u.shield || 0), mor: u.morale || 0,
-    hp: u.hp || 1, cost: u.cost || 0, upkeep: u.upkeep || 0, turns: u.turns || 0,
-  })));
+// cost quartiles over recruitable land units, rounded to numbers a reader can
+// hold in their head; global, so a column means the same thing on every faction
+function costCuts(units) {
+  const costs = units
+    .filter((u) => u.category !== 'ship' && !u.shipType && (u.cost || 0) > 0)
+    .map((u) => u.cost).sort((a, b) => a - b);
+  const q = (p) => Math.round(costs[Math.floor(costs.length * p)] / 100) * 100;
+  return [q(0.25), q(0.5), q(0.75)];
+}
+
+function rosterRole(u) {
+  if (u.category === 'siege' || u.engine) return 'siege';
+  const cav = u.category === 'cavalry';
+  if (u.class === 'missile' || u.class === 'skirmish') return cav ? 'cav-missile' : 'inf-missile';
+  if (u.class === 'spearmen') return 'inf-spear';
+  return (cav ? 'cav-' : 'inf-') + (u.class === 'light' ? 'light' : 'heavy');
+}
+
+function buildRostersHtml(model) {
+  const cuts = costCuts(model.units);
+  const tierOf = (c) => (c < cuts[0] ? 0 : c < cuts[1] ? 1 : c < cuts[2] ? 2 : 3);
+  const land = model.units.filter((u) => (u.cost || 0) > 0 && u.category !== 'ship' && !u.shipType);
+  const rJson = JSON.stringify({
+    cuts,
+    factions: model.factionPages.map((f) => ({ n: f.name, sec: f.section })),
+    units: land.map((u) => {
+      const av = {};
+      for (const f of u.avail.free) av[f] = 1;   // 1 = free, 2 = gated
+      for (const f of u.avail.gated) av[f] = 2;
+      return {
+        n: u.name, s: u.slug, r: rosterRole(u), t: tierOf(u.cost),
+        c: u.cost, up: u.upkeep || 0, men: Math.round((u.men || 0) * 2.5),
+        atk: u.atk || 0, chg: u.chg || 0, msl: u.msl || 0,
+        def: (u.armour || 0) + (u.skill || 0) + (u.shield || 0), mor: u.morale || 0,
+        av, m: u.avail.merc ? 1 : 0,
+      };
+    }),
+  });
   const generated = new Date().toISOString().slice(0, 10);
 
   return `<!DOCTYPE html>
@@ -6219,20 +6318,46 @@ function buildAnalyticsHtml(model) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AGO — Unit Analytics</title>
+<title>AGO — Faction Rosters</title>
 <link href="fonts/fonts.css" rel="stylesheet">
 <style>
-main { max-width: 1000px; margin: 0 auto; padding: 14px 14px 60px; }
+main { max-width: 1080px; margin: 0 auto; padding: 14px 14px 60px; }
 .lead { max-width: 78ch; margin: 0 auto 12px; text-align: center; color: var(--ink-soft); font-style: italic; }
 .controls .axis { font-family: var(--display); font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); }
+.bandbtns { display: inline-flex; gap: 0; border: 1px solid var(--line-dark); border-radius: 3px; overflow: hidden; }
+.bandbtns button { font: inherit; font-size: 13px; padding: 0 11px; height: var(--ctrlh); border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.bandbtns button + button { border-left: 1px solid var(--line-dark); }
+.bandbtns button.active { background: var(--accent-soft); color: var(--accent); }
+table.matrix { border-collapse: collapse; width: 100%; margin-top: 4px; }
+table.matrix th {
+  font-family: var(--display); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-soft); font-weight: normal; padding: 5px 6px; border-bottom: 1px solid var(--line-dark);
+}
+table.matrix th.rl { text-align: right; width: 116px; border-bottom: none; border-right: 1px solid var(--line-dark); }
+table.matrix td { vertical-align: top; padding: 5px 6px; border: 1px solid var(--line); background: var(--panel); width: 22%; }
+table.matrix td.gap { background: repeating-linear-gradient(45deg, #ece0c4 0 6px, var(--parchment) 6px 12px); }
+table.matrix td.gap span {
+  font-family: var(--display); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-deep);
+}
+.chip { display: block; font-size: 13px; line-height: 1.35; padding: 1px 5px; border-left: 3px solid var(--gold-leaf); margin-bottom: 2px; }
+.chip.gated { border-left-color: #3f5e8c; }
+.chip.merc { border-left-color: var(--ink-soft); font-style: italic; }
+.chip a { color: var(--ink); text-decoration: none; }
+.chip a:hover { color: var(--accent); }
+.chip b { float: right; color: var(--ink-soft); font-weight: normal; font-variant-numeric: tabular-nums; }
+.gapline { margin: 10px 0 0; color: var(--ink-soft); }
+.gapline b { color: var(--accent); font-weight: normal; }
+h2.sec {
+  font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent); border-bottom: 2px solid var(--line-dark);
+  padding-bottom: 4px; margin: 30px 0 12px;
+}
 #plot { background: var(--panel); border: 1px solid var(--line-dark); border-radius: 4px; box-shadow: 0 2px 8px rgba(60,40,10,.12); }
 #plot svg { display: block; width: 100%; height: auto; }
-#plot circle { cursor: pointer; transition: r .1s ease; }
-#plot circle:hover { r: 7; }
+#plot circle { cursor: pointer; }
 .axislab { font-family: var(--display); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; fill: var(--ink-soft); }
 .tick { fill: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums; }
 .grid { stroke: var(--line); stroke-width: .5; }
-.vline { stroke: var(--gold-deep); stroke-width: 1.4; stroke-dasharray: 5 4; }
 .tip {
   position: fixed; z-index: 60; pointer-events: none;
   background: #2a201a; color: #f3ead2; border: 1px solid var(--gold-deep);
@@ -6240,115 +6365,156 @@ main { max-width: 1000px; margin: 0 auto; padding: 14px 14px 60px; }
   box-shadow: 0 4px 14px rgba(0,0,0,.4);
 }
 .tip b { color: var(--gold-leaf); font-family: var(--display); letter-spacing: .03em; }
-.legend { text-align: center; margin: 10px 0 4px; }
-.lg { display: inline-block; margin: 0 10px 3px 0; font-size: 13px; cursor: pointer; user-select: none; }
-.lg.off { opacity: .35; }
-.lg i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle; margin-right: 5px; }
-h2.sec {
-  font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--accent); border-bottom: 2px solid var(--line-dark);
-  padding-bottom: 4px; margin: 30px 0 12px;
-}
-.boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px 22px; }
-.board h3 { font-family: var(--display); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-deep); margin: 0 0 5px; }
-.board ol { margin: 0; padding-left: 22px; }
-.board li { margin: 0 0 3px; }
-.board a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--line-dark); }
-.board a:hover { color: var(--accent); }
-.board .bv { float: right; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.legend { text-align: center; margin: 8px 0 4px; font-size: 13px; color: var(--ink-soft); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle; margin: 0 5px 0 14px; }
 .empty { text-align: center; font-style: italic; color: var(--ink-soft); padding: 30px; }
-@media (max-width: 620px) { main { padding: 8px 8px 60px; } }
+@media (max-width: 620px) {
+  main { padding: 8px 8px 60px; }
+  table.matrix th.rl { width: 82px; font-size: 10px; }
+  .chip { font-size: 12px; }
+}
 </style>
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
 <header>
-  <h1>AGO &mdash; Unit Analytics</h1>
-  <p class="sub">Where every unit sits on the field &middot; value, power and specialism</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="analytics.html" class="active">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <h1>AGO &mdash; Faction Rosters</h1>
+  <p class="sub">What a faction can put in the field &middot; by role and price</p>
+  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html" class="active">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
-  <span class="axis">Plot</span>
-  <select id="ysel"></select>
-  <span class="axis">against</span>
-  <select id="xsel"></select>
-  <select id="fac"><option value="">All factions</option></select>
-  <span class="catbtns" id="roles">
-    <button data-r="" class="active">All</button>
-    <button data-r="Infantry">Infantry</button>
-    <button data-r="Ranged">Ranged</button>
-    <button data-r="Cavalry">Cavalry</button>
-    <button data-r="Siege">Siege</button>
-    <button data-r="Ships">Ships</button>
+  <span class="axis">Faction</span>
+  <select id="fac"></select>
+  <span class="axis">Show</span>
+  <span class="bandbtns" id="bands">
+    <button data-b="free" class="active">Home recruitment</button>
+    <button data-b="gated">Conquest &amp; events</button>
+    <button data-b="merc">Mercenaries</button>
   </span>
   <span class="count" id="count"></span>
 </div>
 
 <main>
-  <p class="lead">Each point is a recruitable unit. Plot any two stats against each other &mdash; with cost or upkeep on the bottom axis, a dashed value line is drawn: units above it give more for the gold, units below cost a premium. Hover a point for its name, click to open it. (Bodyguards and event-only units, which have no recruitment cost, are excluded.)</p>
+  <p class="lead">Every unit this faction can recruit, arranged by role and by what it costs. A hatched cell is a genuine hole in the roster &mdash; nothing of that kind at that price. <b>Home recruitment</b> needs only the right building; <b>conquest &amp; events</b> units also need a particular province or a scripted event, so they are off by default; mercenaries are hired in the field. (Bodyguards and event-only units, which have no recruitment cost, are excluded, as are ships.)</p>
+  <table class="matrix" id="matrix"></table>
+  <p class="gapline" id="gaps"></p>
+  <div class="empty" id="empty" hidden>Nothing available under these filters.</div>
+
+  <h2 class="sec">Cost against a single stat</h2>
+  <p class="lead">This faction's units in colour, every other land unit in the game behind them in grey &mdash; the matrix shows the shape of a roster, this shows where it sits in the field. Stats are as declared by the game; there is no combined power score, because there is no defensible way to compute one.</p>
+  <div class="controls">
+    <span class="axis">Cost against</span>
+    <select id="ysel"></select>
+  </div>
   <div id="plot"></div>
   <div class="legend" id="legend"></div>
-
-  <h2 class="sec">Leaderboards</h2>
-  <div class="boards" id="boards"></div>
-  <div class="empty" id="empty" hidden>No units match these filters.</div>
 </main>
 
-<footer>Generated ${generated} &middot; value metrics weigh each stat by unit size; &ldquo;combat power&rdquo; = size &times; (best attack + &frac12; charge + &frac12; defence + &frac14; morale)</footer>
+<footer>Generated ${generated} &middot; price bands are quartiles over every recruitable land unit &middot; roles are the game's own category and class</footer>
 
 <div id="tip" class="tip" hidden></div>
 
 <script>
-const AU = ${aJson};
+const R = ${rJson};
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-const METRICS = {
-  power: { l: 'Combat power', f: u => u.men * (Math.max(u.atk, u.msl || 0) + 0.5 * u.chg + 0.5 * u.def + 0.25 * u.mor) },
-  cost: { l: 'Cost (gold)', f: u => u.cost, costlike: true },
-  upkeep: { l: 'Upkeep / turn', f: u => u.upkeep, costlike: true },
-  cps: { l: 'Cost per soldier', f: u => u.cost / u.men, dp: 1 },
-  av: { l: 'Attack value / 100g', f: u => u.atk * u.men / u.cost * 100 },
-  dv: { l: 'Defence value / 100g', f: u => u.def * u.men / u.cost * 100 },
-  atk: { l: 'Melee attack', f: u => u.atk },
-  chg: { l: 'Charge bonus', f: u => u.chg },
-  msl: { l: 'Missile attack', f: u => u.msl || 0 },
-  def: { l: 'Defence', f: u => u.def },
-  mor: { l: 'Morale', f: u => u.mor },
-  hp: { l: 'Hit points', f: u => u.hp },
-  men: { l: 'Soldiers', f: u => u.men },
-  turns: { l: 'Turns to train', f: u => u.turns },
+
+const ROLES = [
+  ['inf-light', 'Light infantry'], ['inf-heavy', 'Heavy infantry'], ['inf-spear', 'Spearmen'],
+  ['inf-missile', 'Missile infantry'], ['cav-light', 'Light cavalry'], ['cav-heavy', 'Heavy cavalry'],
+  ['cav-missile', 'Missile cavalry'], ['siege', 'Siege'],
+];
+const YM = {
+  def: { l: 'Defence (armour + skill + shield)' },
+  atk: { l: 'Melee attack' },
+  msl: { l: 'Missile attack' },
+  mor: { l: 'Morale' },
+  men: { l: 'Soldiers' },
+  up:  { l: 'Upkeep / turn' },
 };
-const MORDER = ['power','cost','upkeep','cps','av','dv','atk','chg','msl','def','mor','hp','men','turns'];
-const RCOL = { Infantry: '#7c1d1d', Ranged: '#3a6038', Cavalry: '#3f5e8c', Siege: '#a6822f', Ships: '#5a4a6a' };
-function role(u){ if(u.cat==='ship')return 'Ships'; if(u.cat==='siege')return 'Siege'; if(u.cat==='cavalry')return 'Cavalry'; if(u.msl!=null)return 'Ranged'; return 'Infantry'; }
-const state = { x: 'cost', y: 'power', fac: '', role: '', off: {} };
+const RCOL = { inf: '#7c1d1d', cav: '#3f5e8c', siege: '#a6822f' };
+const rcol = u => RCOL[u.r.split('-')[0]] || '#5a4a6a';
 
-const $x = document.getElementById('xsel'), $y = document.getElementById('ysel'), $fac = document.getElementById('fac');
-for (const k of MORDER) {
-  $x.appendChild(new Option(METRICS[k].l, k));
-  $y.appendChild(new Option(METRICS[k].l, k));
+const params = new URLSearchParams(location.search);
+const wanted = params.get('faction');
+const state = {
+  fac: (R.factions.find(f => f.sec === wanted) || R.factions[0]).sec,
+  bands: { free: true, gated: false, merc: false },
+  y: 'def',
+};
+
+const $fac = document.getElementById('fac'), $y = document.getElementById('ysel');
+for (const f of R.factions) $fac.appendChild(new Option(f.n, f.sec));
+$fac.value = state.fac;
+for (const k of ['def','atk','msl','mor','men','up']) $y.appendChild(new Option(YM[k].l, k));
+$y.value = state.y;
+$fac.onchange = () => { state.fac = $fac.value; draw(); };
+$y.onchange = () => { state.y = $y.value; draw(); };
+document.getElementById('bands').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  state.bands[b.dataset.b] = !state.bands[b.dataset.b];
+  b.classList.toggle('active', state.bands[b.dataset.b]);
+  draw();
+});
+
+// band a unit falls in for the current faction, or null if it is out of reach
+function bandOf(u){
+  const a = u.av[state.fac];
+  if (a === 1) return 'free';
+  if (a === 2) return 'gated';
+  return u.m ? 'merc' : null;
 }
-$x.value = state.x; $y.value = state.y;
-for (const f of [...new Set(AU.map(u => u.f))].sort()) $fac.appendChild(new Option(f, f));
+function roster(){
+  const out = [];
+  for (const u of R.units) {
+    const b = bandOf(u);
+    if (b && state.bands[b]) out.push({ u: u, band: b });
+  }
+  return out;
+}
+const facName = sec => (R.factions.find(f => f.sec === sec) || {}).n || sec;
 
-function visible(){ return AU.filter(u => (!state.fac || u.f === state.fac) && (!state.role || role(u) === state.role) && !state.off[role(u)]); }
-function fmtv(k, v){ const m = METRICS[k]; return (m.dp ? v.toFixed(m.dp) : Math.round(v)) + (k === 'cost' || k === 'cps' || k === 'upkeep' ? 'g' : ''); }
+// ------------------------------------------------------------------- matrix
+function drawMatrix(list){
+  const TIERS = ['Under ' + R.cuts[0] + 'g', R.cuts[0] + '&ndash;' + R.cuts[1] + 'g',
+    R.cuts[1] + '&ndash;' + R.cuts[2] + 'g', R.cuts[2] + 'g and up'];
+  let h = '<tr><th class="rl"></th>' + TIERS.map(t => '<th>' + t + '</th>').join('') + '</tr>';
+  const empties = [];
+  for (const r of ROLES) {
+    const inRole = list.filter(e => e.u.r === r[0]);
+    if (!inRole.length) empties.push(r[1]);
+    h += '<tr><th class="rl">' + r[1] + '</th>';
+    for (let t = 0; t < 4; t++) {
+      const cell = inRole.filter(e => e.u.t === t).sort((a, b) => a.u.c - b.u.c);
+      if (!cell.length) { h += '<td class="gap"><span>gap</span></td>'; continue; }
+      h += '<td>' + cell.map(e =>
+        '<span class="chip ' + e.band + '"><b>' + e.u.c + 'g</b>' +
+        '<a href="units.html#' + e.u.s + '">' + esc(e.u.n) + '</a></span>').join('') + '</td>';
+    }
+    h += '</tr>';
+  }
+  document.getElementById('matrix').innerHTML = h;
+  document.getElementById('gaps').innerHTML = empties.length
+    ? 'No ' + empties.map(e => '<b>' + e.toLowerCase() + '</b>').join(', ') + ' at any price.'
+    : 'Every role is covered at some price.';
+}
 
+// ------------------------------------------------------------------ scatter
 function niceTicks(min, max){
-  const span = max - min || 1, step = Math.pow(10, Math.floor(Math.log10(span / 4)));
-  const err = span / 4 / step, mult = err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
-  const s = mult * step, lo = Math.floor(min / s) * s, ticks = [];
-  for (let t = lo; t <= max + s * .5; t += s) if (t >= min - s * .5) ticks.push(t);
-  return ticks;
+  const span = max - min || 1;
+  const raw = span / 5;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10;
+  const out = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + step * 0.001; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  return out.length ? out : [min, max];
 }
-
-function fmtTick(t){ return Math.abs(t) >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + 'k' : Math.round(t); }
-// a robust axis ceiling: if a few points sit far above the rest (a dominating
-// gap near the top, e.g. horde or single-entity units), cap just below the gap
-// so the bulk spreads out; those few clamp to the edge instead of flattening all.
+// the ceiling that keeps one 3570g mumak from squashing everything else into
+// the corner: the largest gap inside the top 5% of values
 function robustMax(vals){
   const s = vals.slice().sort((a, b) => b - a), n = s.length;
-  if (n < 12) return { cap: s[0], n: 0 };
+  if (n < 12) return s[0];
   const look = Math.max(3, Math.floor(n * 0.05));
   let gapIdx = -1, best = 0;
   for (let i = 0; i < look; i++) {
@@ -6356,101 +6522,68 @@ function robustMax(vals){
     if (lo <= 0) break;
     if (hi / lo > best) { best = hi / lo; gapIdx = i; }
   }
-  return (best >= 2.2 && gapIdx >= 0) ? { cap: s[gapIdx + 1], n: gapIdx + 1 } : { cap: s[0], n: 0 };
+  return (best >= 2.2 && gapIdx >= 0) ? s[gapIdx + 1] : s[0];
+}
+function drawScatter(list){
+  const yk = state.y, lab = YM[yk].l;
+  const W = 900, H = 430, M = { l: 66, r: 20, t: 16, b: 46 }, iw = W - M.l - M.r, ih = H - M.t - M.b;
+  const xmax = Math.max(robustMax(R.units.map(u => u.c)), 1);
+  const ymax = Math.max(robustMax(R.units.map(u => u[yk])), 1);
+  const xt = niceTicks(0, xmax), yt = niceTicks(0, ymax);
+  const xhi = Math.max(xmax, xt[xt.length - 1]), yhi = Math.max(ymax, yt[yt.length - 1]);
+  const X = v => M.l + Math.min(v, xhi) / xhi * iw;
+  const Y = v => M.t + ih - Math.min(v, yhi) / yhi * ih;
+  let g = '';
+  for (const t of yt) {
+    const y = Y(t);
+    g += '<line class="grid" x1="' + M.l + '" y1="' + y.toFixed(1) + '" x2="' + (W - M.r) + '" y2="' + y.toFixed(1) + '"/>';
+    g += '<text class="tick" x="' + (M.l - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + t + '</text>';
+  }
+  for (const t of xt) g += '<text class="tick" x="' + X(t).toFixed(1) + '" y="' + (H - M.b + 18) + '" text-anchor="middle">' + t + '</text>';
+  for (const u of R.units) g += '<circle cx="' + X(u.c).toFixed(1) + '" cy="' + Y(u[yk]).toFixed(1) + '" r="3" fill="#b9a67e" fill-opacity=".3"/>';
+  for (const e of list) {
+    const u = e.u;
+    const tt = '<b>' + esc(u.n) + '</b><br>' + lab + ': ' + u[yk] + '<br>Cost: ' + u.c + 'g';
+    g += '<circle cx="' + X(u.c).toFixed(1) + '" cy="' + Y(u[yk]).toFixed(1) + '" r="5" fill="' + rcol(u) +
+      '" fill-opacity=".82" stroke="#fff8e8" stroke-width=".7" data-s="' + u.s +
+      '" data-t="' + tt.replace(/"/g, '&quot;') + '"/>';
+  }
+  g += '<text class="axislab" x="' + (M.l + iw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">Cost (gold)</text>';
+  g += '<text class="axislab" transform="translate(16,' + (M.t + ih / 2) + ') rotate(-90)" text-anchor="middle">' + lab + '</text>';
+  document.getElementById('plot').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Cost against ' + lab + '">' + g + '</svg>';
+  document.getElementById('legend').innerHTML =
+    'Grey: all ' + R.units.length + ' land units' +
+    '<i style="background:#7c1d1d"></i>infantry<i style="background:#3f5e8c"></i>cavalry' +
+    '<i style="background:#a6822f"></i>siege &mdash; ' + facName(state.fac);
 }
 
 function draw(){
-  const us = visible();
-  const xm = METRICS[state.x], ym = METRICS[state.y];
-  const pts = us.map(u => ({ u, x: xm.f(u), y: ym.f(u) })).filter(p => isFinite(p.x) && isFinite(p.y));
-  document.getElementById('count').textContent = pts.length + ' of ' + AU.length + ' units';
-  document.getElementById('empty').hidden = pts.length > 0;
-  if (!pts.length) { document.getElementById('plot').innerHTML = ''; document.getElementById('boards').innerHTML = ''; return; }
-  const W = 760, H = 470, M = { l: 72, r: 22, t: 18, b: 54 }, iw = W - M.l - M.r, ih = H - M.t - M.b;
-  const xv = pts.map(p => p.x), yv = pts.map(p => p.y);
-  const xc = robustMax(xv), yc = robustMax(yv);
-  let xmin = Math.min(...xv), xmax = xc.cap;
-  let ymin = Math.min(...yv), ymax = yc.cap;
-  if (xm.costlike || state.x === 'men' || state.x === 'cps') xmin = Math.min(xmin, 0);
-  ymin = Math.min(ymin, 0);
-  if (xmax <= xmin) xmax = xmin + 1; if (ymax <= ymin) ymax = ymin + 1;
-  const xt = niceTicks(xmin, xmax), yt = niceTicks(ymin, ymax);
-  xmin = Math.min(xmin, xt[0]); xmax = Math.max(xmax, xt[xt.length - 1]);
-  ymin = Math.min(ymin, yt[0]); ymax = Math.max(ymax, yt[yt.length - 1]);
-  const X = v => M.l + (Math.min(v, xmax) - xmin) / (xmax - xmin) * iw;
-  const Y = v => M.t + ih - (Math.min(v, ymax) - ymin) / (ymax - ymin) * ih;
-  const over = p => p.x > xmax || p.y > ymax;
-  let g = '';
-  // grid + ticks
-  for (const t of yt) { const y = Y(t); g += '<line class="grid" x1="' + M.l + '" y1="' + y.toFixed(1) + '" x2="' + (W - M.r) + '" y2="' + y.toFixed(1) + '"/>'; g += '<text class="tick" x="' + (M.l - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + fmtTick(t) + '</text>'; }
-  for (const t of xt) { const x = X(t); g += '<text class="tick" x="' + x.toFixed(1) + '" y="' + (H - M.b + 18) + '" text-anchor="middle">' + fmtTick(t) + '</text>'; }
-  // value line (least-squares over in-range points) when the x axis is a price
-  const inr = pts.filter(p => !over(p));
-  if (xm.costlike && inr.length > 3) {
-    const n = inr.length, sx = inr.reduce((a, p) => a + p.x, 0), sy = inr.reduce((a, p) => a + p.y, 0);
-    const sxx = inr.reduce((a, p) => a + p.x * p.x, 0), sxy = inr.reduce((a, p) => a + p.x * p.y, 0);
-    const b = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1), a = (sy - b * sx) / n;
-    const y0 = Math.max(ymin, Math.min(ymax, a + b * xmin)), y1 = Math.max(ymin, Math.min(ymax, a + b * xmax));
-    g += '<line class="vline" x1="' + X(xmin) + '" y1="' + Y(y0).toFixed(1) + '" x2="' + X(xmax) + '" y2="' + Y(y1).toFixed(1) + '"/>';
-  }
-  // points; the rare unit beyond the axis range clamps to the edge as a hollow marker
-  let clamped = 0;
-  for (const p of pts) {
-    const r = role(p.u), c = RCOL[r], cx = X(p.x), cy = Y(p.y), o = over(p);
-    if (o) clamped++;
-    const tt = '<b>' + esc(p.u.n) + '</b><br>' + esc(p.u.f) + ' &middot; ' + r + '<br>' + ym.l + ': ' + fmtv(state.y, p.y) + '<br>' + xm.l + ': ' + fmtv(state.x, p.x) + (o ? '<br><i>beyond axis range</i>' : '');
-    const data = ' data-s="' + p.u.s + '" data-t="' + tt.replace(/"/g, '&quot;') + '"';
-    if (o) g += '<path d="M' + cx.toFixed(1) + ' ' + (cy - 5).toFixed(1) + 'L' + (cx - 4.5).toFixed(1) + ' ' + (cy + 3.5).toFixed(1) + 'L' + (cx + 4.5).toFixed(1) + ' ' + (cy + 3.5).toFixed(1) + 'Z" fill="' + c + '" fill-opacity="0.25" stroke="' + c + '" stroke-width="1.3"' + data + '/>';
-    else g += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="4.5" fill="' + c + '" fill-opacity="0.78" stroke="#fff8e8" stroke-width="0.6"' + data + '/>';
-  }
-  if (clamped) g += '<text class="tick" x="' + (W - M.r) + '" y="' + (M.t + 2) + '" text-anchor="end" fill="#856425">&#9650; ' + clamped + ' beyond range</text>';
-  // axis titles
-  g += '<text class="axislab" x="' + (M.l + iw / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + xm.l + '</text>';
-  g += '<text class="axislab" transform="translate(16,' + (M.t + ih / 2) + ') rotate(-90)" text-anchor="middle">' + ym.l + '</text>';
-  document.getElementById('plot').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Unit scatter plot">' + g + '</svg>';
-
-  // legend (clickable to mute a role)
-  document.getElementById('legend').innerHTML = Object.keys(RCOL).map(r =>
-    '<span class="lg' + (state.off[r] ? ' off' : '') + '" data-r="' + r + '"><i style="background:' + RCOL[r] + '"></i>' + r + '</span>').join('');
-
-  // leaderboards (respect filters)
-  const BOARDS = [['Best melee value', 'av'], ['Best defence value', 'dv'], ['Highest combat power', 'power'], ['Cheapest per soldier', 'cps', true], ['Highest morale', 'mor'], ['Strongest charge', 'chg']];
-  document.getElementById('boards').innerHTML = BOARDS.map(([lab, k, asc]) => {
-    const arr = us.filter(u => isFinite(METRICS[k].f(u))).sort((a, b) => (METRICS[k].f(b) - METRICS[k].f(a)) * (asc ? -1 : 1)).slice(0, 8);
-    return '<div class="board"><h3>' + lab + '</h3><ol>' + arr.map(u =>
-      '<li><a href="units.html#' + u.s + '">' + esc(u.n) + '</a> <span class="bv">' + fmtv(k, METRICS[k].f(u)) + '</span></li>').join('') + '</ol></div>';
-  }).join('');
+  const list = roster();
+  document.getElementById('count').textContent = list.length + ' units';
+  document.getElementById('empty').hidden = list.length > 0;
+  drawMatrix(list);
+  drawScatter(list);
 }
 
-$x.addEventListener('change', e => { state.x = e.target.value; draw(); });
-$y.addEventListener('change', e => { state.y = e.target.value; draw(); });
-$fac.addEventListener('change', e => { state.fac = e.target.value; draw(); });
-document.getElementById('roles').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  state.role = b.dataset.r;
-  for (const x of document.querySelectorAll('#roles button')) x.classList.toggle('active', x === b);
-  draw();
-});
-document.getElementById('legend').addEventListener('click', e => {
-  const s = e.target.closest('.lg'); if (!s) return;
-  const r = s.dataset.r; state.off[r] = !state.off[r]; draw();
-});
-const plot = document.getElementById('plot'), tip = document.getElementById('tip');
-plot.addEventListener('mousemove', e => {
-  const c = e.target.closest('[data-s]');
+const tip = document.getElementById('tip');
+document.addEventListener('mousemove', e => {
+  const c = e.target.closest ? e.target.closest('[data-s]') : null;
   if (!c) { tip.hidden = true; return; }
   tip.hidden = false; tip.innerHTML = c.getAttribute('data-t');
   tip.style.left = Math.min(e.clientX + 14, innerWidth - 250) + 'px';
   tip.style.top = (e.clientY + 14) + 'px';
 });
-plot.addEventListener('mouseleave', () => { tip.hidden = true; });
-plot.addEventListener('click', e => { const c = e.target.closest('[data-s]'); if (c) location.href = 'units.html#' + c.getAttribute('data-s'); });
+document.getElementById('plot').addEventListener('click', e => {
+  const c = e.target.closest('[data-s]');
+  if (c) location.href = 'units.html#' + c.getAttribute('data-s');
+});
 draw();
 </script>
 </body>
 </html>
 `;
 }
+
 
 // ------------------------------------------------------------- global search
 // One combined index across every section, written to a standalone
@@ -6484,7 +6617,7 @@ function buildPortalHtml(model) {
   const ch = model.characters, w = model.world, an = model.annals, d = model.diff;
   const ICON = {
     units: 'M12 2 4 5v6c0 5.2 3.6 8.2 8 11 4.4-2.8 8-5.8 8-11V5z',
-    analytics: 'M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z',
+    rosters: 'M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z',
     factions: 'M5 3h13l-3 4 3 4H7v10H5z',
     buildings: 'M7 22V8l5-4 5 4v14h-4v-5h-2v5z',
     characters: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0z',
@@ -6495,8 +6628,8 @@ function buildPortalHtml(model) {
   };
   const cards = [
     ['units.html', 'Units', model.units.length + ' units', 'Stats, recruitment and cost &mdash; table and war-card views', 'units'],
-    ['analytics.html', 'Analytics', 'value &amp; power', 'Cost-vs-power scatter, value frontier and leaderboards', 'analytics'],
-    ['factions.html', 'Factions', model.factionPages.length + ' factions', 'Rosters, questlines, victory goals and patch impact', 'factions'],
+    ['rosters.html', 'Rosters', 'role &times; price', 'What each faction can field, where the gaps are, cost against stats', 'rosters'],
+    ['factions.html', 'Factions', model.factionPages.length + ' factions', 'Questlines, victory goals, heroes and patch impact', 'factions'],
     ['buildings.html', 'Buildings &amp; Guilds', model.buildings.length + ' chains', 'Tiers, effects, recruits and the settlement tech tree', 'buildings'],
     ['characters.html', 'Characters', ch.traits.length + ' traits &middot; ' + ch.ancs.length + ' retinue', 'Trait ladders and triggers, the Nine, battle abilities', 'characters'],
     ['regions.html', 'World', w.regions.length + ' provinces', 'Owners, faiths, garrisons, rebels and landmarks', 'world'],
@@ -6586,7 +6719,7 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
 <header>
   <h1>AGO Compendium</h1>
   <p class="sub">The complete field archive for Divide and Conquer: AGO</p>
-  <nav class="sitenav"><a href="index.html" class="active">Home</a><a href="units.html">Units</a><a href="analytics.html">Analytics</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
+  <nav class="sitenav"><a href="index.html" class="active">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -6712,8 +6845,8 @@ console.log(`Annals page: ${model.annals.events.length} event scrolls, ${model.a
 writePage(path.join(__dirname, 'mechanics.html'), buildMechanicsHtml(model));
 writePage(path.join(__dirname, 'about.html'), buildAboutHtml());
 console.log('About page: credits rendered.');
-writePage(path.join(__dirname, 'analytics.html'), buildAnalyticsHtml(model));
-console.log('Analytics page: scatter + leaderboards over ' + model.units.filter((u) => (u.cost || 0) > 0).length + ' recruitable units.');
+writePage(path.join(__dirname, 'rosters.html'), buildRostersHtml(model));
+console.log('Rosters page: role x price matrix over ' + model.units.filter((u) => (u.cost || 0) > 0 && u.category !== 'ship' && !u.shipType).length + ' recruitable land units.');
 writePage(path.join(__dirname, 'changes.html'), buildChangesHtml(model));
 console.log(model.diff
   ? `Changes page: ${model.diff.changed.length} changed, ${model.diff.added.length} added, ${model.diff.removed.length} removed (${model.diff.from} -> ${model.diff.to}).`
@@ -6740,6 +6873,25 @@ console.log(`Mechanics page: ${model.mechanics.cfg.length} settings, ${model.mec
 }
 console.log(`Factions page: ${model.factionPages.length} playable factions.`);
 console.log(`Parsed ${model.units.length} units across ${model.factions.length} sections (${model.eopCount} added from eopData).`);
+// `faction` is only the EDU comment banner it was listed under; `avail` is the
+// real thing. Most units are shared, so a collapse back to one owner is a bug.
+{
+  const us = model.units;
+  if (us.some((u) => !u.avail || !Array.isArray(u.avail.free) || !Array.isArray(u.avail.gated))) {
+    throw new Error('unit.avail missing free/gated');
+  }
+  // ownerMap is a majority vote of each faction tag's units over EDU section
+  // banners. Its one fatal failure is two tags collapsing onto one section:
+  // a faction's whole roster silently merges into another's and the totals
+  // still look plausible.
+  const secs = Object.values(model.ownerMap);
+  if (new Set(secs).size !== secs.length) {
+    throw new Error('ownerMap is not injective: two faction tags share one section');
+  }
+  const multi = us.filter((u) => u.avail.free.length > 1).length;
+  const merc = us.filter((u) => u.avail.merc).length;
+  console.log(`Availability: ${us.filter((u) => u.avail.free.length).length} units freely recruitable (${multi} by more than one faction), ${us.filter((u) => u.avail.gated.length).length} behind a province or event gate, ${merc} mercenary-tagged, ${us.filter((u) => u.avail.anyOwner).length} with an unrestricted pool.`);
+}
 console.log(`Buildings: ${model.buildings.length} chains (${model.buildings.filter((b) => b.cat === 'Guilds').length} guild chains).`);
 console.log(`${model.recruitable} units have building recruitment data; ${model.mercCount} have mercenary pools.`);
 if (model.missingNames) console.log(`${model.missingNames} units had no entry in export_units.txt (internal name used).`);
