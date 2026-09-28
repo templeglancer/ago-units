@@ -2601,6 +2601,7 @@ a.ref:hover { background: rgba(122,31,31,.08); }
   padding: 20px;
 }
 #ref-modal[hidden] { display: none; }
+#cmp-bar[hidden] { display: none; }
 .ref-box {
   background: var(--parchment);
   border: 2px solid var(--line-dark);
