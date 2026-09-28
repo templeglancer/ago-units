@@ -106,6 +106,69 @@ node build.js              # rebuild; changes.html diffs new values vs baseline
 current data against it. The baseline advances only when you re-run
 `--snapshot`, so "changes since the last update" stays meaningful.
 
+### Release checklist
+
+The full sequence used for the 3.2.4 → 3.3.4 update:
+
+1. **Work from a git clone inside the mod folder.** `build.js` reads
+   `../data` and `../eopData`, so the repo must sit directly in the mod
+   directory, e.g.
+   `...\Medieval II Total War\mods\AGO_V3\ago-units`. A downloaded ZIP of
+   the repo is not a checkout and cannot be committed or pushed.
+
+   ```
+   git clone https://github.com/templeglancer/ago-units.git
+   ```
+
+2. **Pull the latest `main`.**
+
+   ```
+   git pull --ff-only
+   ```
+
+3. **Check the baseline and the installed version.** The baseline version is
+   the `"version"` at the start of `archive/baseline.json`; the installed mod
+   version is `"modVersion"` in `../eopData/config/uiCfg.json`. If the
+   baseline is already the previous release (e.g. `3.2.4` while the mod
+   reports `3.3.4`), skip `--snapshot`: running it now would freeze the *new*
+   values and leave `changes.html` empty. Only snapshot while the old
+   version's data is still installed.
+
+4. **Build.**
+
+   ```
+   node build.js
+   ```
+
+   The log line `Changes page: N changed, N added, N removed (old -> new)`
+   should name the two versions you expect.
+
+5. **Check `changes.html`.** The heading should read "old to new", and the
+   summary counts and the added/removed units should match the build log.
+
+6. **Commit everything the build produced**, including untracked files: a new
+   version brings new pictures in `cards/`, `portraits/`, `buildingpics/` and
+   `ancpics/`, and the build deletes pictures that are no longer referenced.
+
+   ```
+   git add -A
+   git commit -m "Rebuild for AGO <new>: changes page diffs <old> -> <new>"
+   git push origin main
+   ```
+
+   On a machine without a git identity, set one for this repo first
+   (`git config user.name ...` and `git config user.email ...`).
+
+7. **Confirm the deploy.** Pushing to `main` triggers the GitHub Pages
+   "pages build and deployment" run (a few minutes). When it finishes,
+   https://agocompendium.com/changes.html should show the new version pair
+   and summary counts.
+
+8. **Before the next mod update**, run `node build.js --snapshot` while the
+   current version is still installed, and commit `archive/baseline.json`.
+   Don't snapshot straight after a release build: `changes.html` would then
+   show no changes until the next update.
+
 ## Features
 
 - All 606 units (531 from the base files + 75 M2TWEOP additions) grouped by
