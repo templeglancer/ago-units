@@ -2,9 +2,11 @@
 
 Live at **https://agocompendium.com** (GitHub Pages behind Cloudflare).
 
-A self-contained website. The homepage **index.html** is an archive-hall
-portal — a hero, a unit search, and section cards into every part of the
-site (old `index.html#unit-slug` / `?faction=` links redirect to units.html
+A self-contained website. Every page shares a dark side rail for navigation
+(`siteRail()` in build.js; it becomes a top bar on narrow screens). The
+homepage **index.html** is a muster: a hero of unit portraits with the search,
+a strip of faction banners, picture tiles into every part of the site, and the
+units added in the latest update (old `index.html#unit-slug` / `?faction=` links redirect to units.html
 so shared bookmarks keep working). The portal search is a **global search**
 across every section (units, factions, buildings, traits, retinue, heroes,
 provinces, events, mechanics) — results grouped by kind, each linking to its

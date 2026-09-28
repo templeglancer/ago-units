@@ -2820,10 +2820,10 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('units.html')}
 <header>
   <h1>AGO &mdash; Unit Compendium</h1>
   <p class="sub">A field guide to every host of Middle-earth &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html" class="active">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -3579,10 +3579,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 .controls {
   position: sticky;
   top: 0;
@@ -3775,10 +3771,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('buildings.html')}
 <header>
   <h1>AGO &mdash; Buildings &amp; Guilds</h1>
   <p class="sub">Every structure of Middle-earth, from palisade to citadel &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html" class="active">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -4173,10 +4169,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 main { max-width: 1100px; margin: 0 auto; padding: 12px 14px 60px; }
 h2.side {
   font-family: var(--display);
@@ -4307,10 +4299,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('factions.html')}
 <header>
   <h1>AGO &mdash; Factions</h1>
   <p class="sub">The free peoples and the shadow &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html" class="active">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main id="main"></main>
@@ -4617,10 +4609,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 .controls {
   position: sticky;
   top: 0;
@@ -4727,10 +4715,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('characters.html')}
 <header>
   <h1>AGO &mdash; Characters</h1>
   <p class="sub">Traits your generals and agents earn, and the retinue they gather &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html" class="active">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5001,10 +4989,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 .controls {
   position: sticky;
   top: 0;
@@ -5140,10 +5124,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('regions.html')}
 <header>
   <h1>AGO &mdash; World</h1>
   <p class="sub">Every province of Middle-earth: owners, faiths, garrisons and the rebels in the hills &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html" class="active">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5362,10 +5346,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 .controls {
   position: sticky;
   top: 0;
@@ -5467,10 +5447,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('annals.html')}
 <header>
   <h1>AGO &mdash; Annals</h1>
   <p class="sub">Every tale the campaign can tell: event scrolls and calamities &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html" class="active">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -5679,10 +5659,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 main { max-width: 840px; margin: 0 auto; padding: 16px 14px 60px; }
 .toc {
   text-align: center;
@@ -5735,10 +5711,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('about.html')}
 <header>
   <h1>AGO &mdash; About</h1>
   <p class="sub">The mod, its makers and its history &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html" class="active">About</a></nav>
 </header>
 
 <main>
@@ -5881,10 +5857,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 main { max-width: 880px; margin: 0 auto; padding: 16px 14px 60px; }
 .toc {
   text-align: center;
@@ -5954,10 +5926,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('mechanics.html')}
 <header>
   <h1>AGO &mdash; Mechanics</h1>
   <p class="sub">How the numbers work: combat, the Ring, spycraft, raiding and the settings file &middot; Medieval II: Total War</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html" class="active">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -6175,10 +6147,6 @@ header h1 {
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
 }
 header .sub { font-style: italic; color: var(--ink-soft); margin: 6px 0 0; font-size: 17px; }
-.sitenav { margin: 10px 0 0; font-family: var(--display); font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; }
-.sitenav a { color: var(--ink-soft); text-decoration: none; padding: 2px 10px; border-bottom: 2px solid transparent; }
-.sitenav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sitenav a:hover { color: var(--accent); }
 main { max-width: 920px; margin: 0 auto; padding: 16px 14px 60px; }
 .summary { text-align: center; font-size: 15px; color: var(--ink-soft); margin: 4px 0 18px; }
 .summary b { color: var(--ink); }
@@ -6245,10 +6213,10 @@ footer {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('changes.html')}
 <header>
   <h1>AGO &mdash; Changes</h1>
   <p class="sub">${title}</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html" class="active">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <main>
@@ -6377,10 +6345,10 @@ h2.sec {
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
+${siteRail('rosters.html')}
 <header>
   <h1>AGO &mdash; Faction Rosters</h1>
   <p class="sub">What a faction can put in the field &middot; by role and price</p>
-  <nav class="sitenav"><a href="index.html">Home</a><a href="units.html">Units</a><a href="rosters.html" class="active">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
 </header>
 
 <div class="controls">
@@ -6609,40 +6577,76 @@ function buildSearchIndex(model) {
   return idx;
 }
 
+// ------------------------------------------------------------------ side rail
+
+// Every page's navigation: [href, label, 24x24 icon path].
+const SITE_NAV = [
+  ['index.html', 'Home', 'M3 11l9-8 9 8v10h-6v-6H9v6H3z'],
+  ['units.html', 'Units', 'M12 2 4 5v6c0 5.2 3.6 8.2 8 11 4.4-2.8 8-5.8 8-11V5z'],
+  ['rosters.html', 'Rosters', 'M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z'],
+  ['factions.html', 'Factions', 'M5 3h13l-3 4 3 4H7v10H5z'],
+  ['buildings.html', 'Buildings &amp; Guilds', 'M7 22V8l5-4 5 4v14h-4v-5h-2v5z'],
+  ['characters.html', 'Characters', 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0z'],
+  ['regions.html', 'World', 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z'],
+  ['annals.html', 'Annals', 'M7 4h10v13a3 3 0 0 1-3 3H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'],
+  ['mechanics.html', 'Mechanics', 'M3 5c3-1 6-1 9 1v14c-3-2-6-2-9-1zM21 5c-3-1-6-1-9 1v14c3-2 6-2 9-1z'],
+  ['changes.html', 'Changes', 'M8 3l4 5H9v6H7V8H4zM16 21l-4-5h3v-6h2v6h3z'],
+  ['about.html', 'About', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8v8h2v-8zm0-4v2h2V6z'],
+];
+const navIcon = (href) => (SITE_NAV.find((n) => n[0] === href) || [])[2] || '';
+const svgIcon = (d) => '<svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="' + d + '"/></svg>';
+
+function siteRail(active) {
+  const ver = modVersion();
+  const built = new Date().toISOString().slice(0, 10);
+  return '<aside class="rail">' +
+    '<a class="brand" href="index.html"><span class="mono"><span>A</span></span><span><b>AGO</b><i>Compendium</i></span></a>' +
+    '<nav aria-label="Site">' + SITE_NAV.map(([href, label, icon]) =>
+      '<a href="' + href + '"' + (href === active ? ' class="active" aria-current="page"' : '') + '>' + svgIcon(icon) + label + '</a>').join('') + '</nav>' +
+    '<div class="railfoot">' + (ver ? 'Mod version <b>' + ver + '</b><br>' : '') + 'Built ' + built + '</div>' +
+    '</aside>';
+}
+
 // ------------------------------------------------------------- homepage portal
 
 function buildPortalHtml(model) {
   const ver = modVersion();
-  const generated = new Date().toISOString().slice(0, 10);
   const ch = model.characters, w = model.world, an = model.annals, d = model.diff;
-  const ICON = {
-    units: 'M12 2 4 5v6c0 5.2 3.6 8.2 8 11 4.4-2.8 8-5.8 8-11V5z',
-    rosters: 'M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z',
-    factions: 'M5 3h13l-3 4 3 4H7v10H5z',
-    buildings: 'M7 22V8l5-4 5 4v14h-4v-5h-2v5z',
-    characters: 'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0z',
-    world: 'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z',
-    annals: 'M7 4h10v13a3 3 0 0 1-3 3H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
-    mechanics: 'M3 5c3-1 6-1 9 1v14c-3-2-6-2-9-1zM21 5c-3-1-6-1-9 1v14c3-2 6-2 9-1z',
-    changes: 'M8 3l4 5H9v6H7V8H4zM16 21l-4-5h3v-6h2v6h3z',
-  };
-  const cards = [
-    ['units.html', 'Units', model.units.length + ' units', 'Stats, recruitment and cost &mdash; table and war-card views', 'units'],
-    ['rosters.html', 'Rosters', 'role &times; price', 'What each faction can field, where the gaps are, cost against stats', 'rosters'],
-    ['factions.html', 'Factions', model.factionPages.length + ' factions', 'Questlines, victory goals, heroes and patch impact', 'factions'],
-    ['buildings.html', 'Buildings &amp; Guilds', model.buildings.length + ' chains', 'Tiers, effects, recruits and the settlement tech tree', 'buildings'],
-    ['characters.html', 'Characters', ch.traits.length + ' traits &middot; ' + ch.ancs.length + ' retinue', 'Trait ladders and triggers, the Nine, battle abilities', 'characters'],
-    ['regions.html', 'World', w.regions.length + ' provinces', 'Owners, faiths, garrisons, rebels and landmarks', 'world'],
-    ['annals.html', 'Annals', an.events.length + ' scrolls', 'Every campaign event and calamity, by faction', 'annals'],
-    ['mechanics.html', 'Mechanics', 'combat &amp; systems', 'Combat primer, the Ring, spycraft, raiding, settings', 'mechanics'],
-    ['changes.html', 'Changes', d ? d.changed.length + ' changed' : 'patch diff', 'What changed in the latest update, by faction', 'changes'],
+  const e = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // Portraits are picked by file name; one the mod no longer ships falls back
+  // to the next unit that has a portrait, so the page never shows a hole.
+  const pics = new Set(model.units.map((u) => u.pic).filter(Boolean));
+  const spare = [...pics];
+  let next = 0;
+  const pic = (name) => pics.has('portraits/' + name + '.png') ? 'portraits/' + name + '.png' : spare[next++ % spare.length];
+  const strip = ['rohan_bodyguard', 'gondor_archers', 'black_uruk_captains', 'lorien_archer', 'isengard_trolls',
+    'dol_amroth_guardsmen', 'haradrim_spearmen', 'angmar_bodyguards', 'windriders_bodyguard', 'highwaymen']
+    .map((n, i) => '<img src="' + pic(n) + '" alt="" style="animation-delay:' + i * 70 + 'ms">').join('');
+  // [href, title, count, description, portrait, tile size]
+  const sections = [
+    ['units.html', 'Units', model.units.length + ' units', 'Stats, recruitment and cost &mdash; table and war-card views', 'rohan_bodyguard', 'big'],
+    ['rosters.html', 'Rosters', 'role &times; price', 'What each faction can field, where the gaps are, cost against stats', 'dol_amroth_guardsmen', ''],
+    ['factions.html', 'Factions', model.factionPages.length + ' factions', 'Questlines, victory goals, heroes and patch impact', 'black_uruk_captains', 'wide'],
+    ['buildings.html', 'Buildings &amp; Guilds', model.buildings.length + ' chains', 'Tiers, effects, recruits and the settlement tech tree', 'isengard_trolls', ''],
+    ['characters.html', 'Characters', ch.traits.length + ' traits &middot; ' + ch.ancs.length + ' retinue', 'Trait ladders and triggers, the Nine, battle abilities', 'angmar_bodyguards', 'wide'],
+    ['regions.html', 'World', w.regions.length + ' provinces', 'Owners, faiths, garrisons, rebels and landmarks', 'haradrim_spearmen', ''],
+    ['annals.html', 'Annals', an.events.length + ' scrolls', 'Every campaign event and calamity, by faction', 'lorien_archer', ''],
+    ['mechanics.html', 'Mechanics', 'combat &amp; systems', 'Combat primer, the Ring, spycraft, raiding, settings', 'gondor_archers', 'wide'],
+    ['changes.html', 'Changes', d ? d.changed.length + ' changed' : 'patch diff', 'What changed in the latest update, by faction', 'highwaymen', 'wide'],
   ];
-  const cardHtml = cards.map(([href, title, count, desc, ic], i) =>
-    '<a class="pcard" href="' + href + '" style="animation-delay:' + Math.min(i * 45, 360) + 'ms">' +
-    '<span class="pic"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="' + ICON[ic] + '"/></svg></span>' +
-    '<span class="pt">' + title + '</span>' +
-    '<span class="pcount">' + count + '</span>' +
-    '<span class="pd">' + desc + '</span></a>').join('');
+  const tiles = sections.map(([href, title, count, desc, p, size]) =>
+    '<a class="ptile' + (size ? ' ' + size : '') + '" href="' + href + '"><img src="' + pic(p) + '" alt="" loading="lazy">' +
+    '<span class="tx"><b>' + title + '</b><em>' + count + '</em><i>' + desc + '</i></span></a>').join('');
+  const banners = model.factionPages.filter((f) => f.sym).map((f) =>
+    '<a href="factions.html#' + f.slug + '"><img src="' + f.sym + '" alt="" loading="lazy"><span>' + e(f.name) + '</span></a>').join('');
+  const bySlug = new Map(model.units.map((u) => [u.slug, u]));
+  const fresh = d ? d.added.map((a) => bySlug.get(a.slug)).filter((u) => u && u.pic).slice(0, 4) : [];
+  const newHtml = !d ? '' :
+    '<section class="pnew"><div class="nt"><h2>New to the field in ' + e(d.to) + '</h2>' +
+    '<p><b>' + d.changed.length + '</b> units rebalanced &middot; <b>' + d.added.length + '</b> added &middot; <b>' + d.removed.length + '</b> removed since ' + e(d.from) + '.</p>' +
+    '<a href="changes.html">See every change &rarr;</a></div>' +
+    fresh.map((u) => '<a class="nu" href="units.html#' + u.slug + '"><img src="' + u.pic + '" alt=""><span>' + e(u.name) + '</span></a>').join('') +
+    '</section>';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -6655,54 +6659,57 @@ function buildPortalHtml(model) {
 <meta name="description" content="The complete data field guide for the Divide and Conquer: AGO mod — units, factions, buildings, characters, regions, events, mechanics and patch changes, generated from the mod files.">
 <link href="fonts/fonts.css" rel="stylesheet">
 <style>
-main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
-.phero { text-align: center; padding: 18px 0 8px; }
-.phero .tagline { font-size: 18px; color: var(--ink-soft); font-style: italic; margin: 0 auto 14px; max-width: 60ch; }
-.cred { font-family: var(--display); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-deep); margin: 0 0 18px; }
-.cred b { color: var(--ink-soft); font-weight: 600; }
-.psearch { margin: 0 auto 8px; max-width: 540px; display: flex; gap: 8px; }
-.psearch input {
-  flex: 1; font-family: var(--serif); font-size: 17px; color: var(--ink);
-  background: var(--panel); border: 1px solid var(--line-dark); border-radius: 4px; padding: 10px 14px;
-  transition: border-color .18s ease, box-shadow .18s ease;
-}
-.psearch input:focus { outline: none; border-color: var(--gold-deep); box-shadow: 0 0 0 2px rgba(196,160,74,.35); }
-.psearch button {
-  font-family: var(--display); font-size: 13px; letter-spacing: .04em; cursor: pointer;
-  background: var(--accent); color: #f6eeda; border: 1px solid var(--accent); border-radius: 4px; padding: 0 18px;
-  box-shadow: inset 0 1px 0 rgba(255,250,235,.18);
-}
+/* hero: a muster of unit portraits behind the title and search */
+.phero { position: relative; height: min(72vh, 600px); min-height: 440px; overflow: hidden; background: #120d09; }
+.pstrip { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); }
+.pstrip img { width: 100%; height: 100%; object-fit: cover; object-position: center 18%; filter: saturate(.75) contrast(1.05); opacity: 0; animation: pRise 1s ease forwards; }
+@keyframes pRise { from { opacity: 0; transform: scale(1.06); } to { opacity: .9; transform: none; } }
+.phero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(14,10,7,.94) 0%, rgba(14,10,7,.78) 38%, rgba(14,10,7,.25) 75%, rgba(14,10,7,.5) 100%), linear-gradient(transparent 60%, rgba(14,10,7,.85)); }
+.phin { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 clamp(16px, 4vw, 48px) 56px; max-width: 760px; }
+.phin .k { font-family: var(--display); font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold-leaf); margin: 0 0 12px; }
+.phin h1 { font-family: var(--display); font-weight: 700; color: #f7ecd0; font-size: clamp(34px, 5.4vw, 64px); line-height: 1.02; margin: 0 0 14px; letter-spacing: .02em; text-shadow: 0 2px 20px rgba(0,0,0,.6); }
+.phin .s { color: #d6c6a4; font-size: 19px; margin: 0 0 24px; font-style: italic; }
+.psearch { max-width: 620px; display: flex; gap: 8px; }
+.psearch input { flex: 1; min-width: 0; font-family: var(--serif); font-size: 18px; color: var(--ink); background: rgba(250,244,228,.96); border: 1px solid transparent; border-radius: 3px; padding: 13px 16px; }
+.psearch input:focus { outline: none; box-shadow: 0 0 0 3px rgba(196,160,74,.55); }
+.psearch button { font-family: var(--display); font-size: 13px; font-weight: 700; letter-spacing: .04em; cursor: pointer; background: var(--gold-leaf); color: #1a1209; border: 1px solid var(--gold-leaf); border-radius: 3px; padding: 0 24px; }
+.psearch button:hover { background: #d4b25c; }
 .psearch button:active { transform: translateY(1px); }
-.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 16px; margin: 26px 0 8px; }
-.pgrid[hidden] { display: none; }
-.pcard {
-  display: block; text-decoration: none; color: inherit;
-  background: var(--panel); border: 1px solid var(--line-dark); border-top: 3px solid var(--gold);
-  border-radius: 5px; padding: 18px 18px 16px; box-shadow: 0 1px 3px rgba(60,40,10,.14);
-  opacity: 0; transform: translateY(10px); animation: pcardIn .5s ease forwards;
-  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
-}
-@keyframes pcardIn { to { opacity: 1; transform: none; } }
-.pcard:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(60,40,10,.26); border-top-color: var(--gold-leaf); }
-.pcard .pic {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: 50%; margin-bottom: 11px;
-  background: radial-gradient(circle at 35% 30%, #f7eccb, #e7d3a0); color: var(--gold-deep);
-  border: 1px solid var(--gold);
-}
-.pcard .pic svg { width: 24px; height: 24px; }
-.pcard .pt { display: block; font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: .04em; color: var(--accent); }
-.pcard .pcount { display: block; font-size: 13px; color: var(--gold-deep); font-variant-numeric: tabular-nums; margin: 1px 0 6px; }
-.pcard .pd { display: block; font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
-.pchanges {
-  margin: 26px auto 0; max-width: 620px; text-align: center;
-  background: var(--parchment-dark); border: 1px solid var(--line-dark); border-radius: 5px; padding: 14px 18px;
-}
-.pchanges h2 { font-family: var(--display); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 6px; }
-.pchanges a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
-.pchanges .nums { font-size: 15px; }
-.pchanges .nums b { font-variant-numeric: tabular-nums; }
-#results { margin: 24px 0 8px; }
+/* body */
+.pwrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 32px) 8px; }
+.pwrap h2 { font-family: var(--display); font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0 0 12px; }
+.pwrap h2 span { color: var(--ink-soft); letter-spacing: .06em; margin-left: 10px; font-family: var(--serif); text-transform: none; font-size: 14px; font-style: italic; }
+.pbody[hidden] { display: none; }
+.pbanners { margin: 30px 0; }
+.brow { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.brow a { flex: none; width: 74px; text-align: center; text-decoration: none; color: var(--ink-soft); font-size: 12px; line-height: 1.2; }
+.brow img { width: 52px; height: 52px; display: block; margin: 0 auto 5px; transition: transform .18s ease; filter: drop-shadow(0 2px 3px rgba(60,40,10,.3)); }
+.brow a:hover img { transform: translateY(-3px) scale(1.06); }
+.brow a:hover { color: var(--accent); }
+.pbento { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 190px; grid-auto-flow: dense; gap: 12px; }
+.ptile { position: relative; overflow: hidden; border-radius: 4px; text-decoration: none; background: #1a130d; }
+.ptile.big { grid-column: span 2; grid-row: span 2; }
+.ptile.wide { grid-column: span 2; }
+.ptile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; filter: saturate(.8); transition: transform .5s ease, filter .3s ease; }
+.ptile::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 30%, rgba(12,9,6,.9)); }
+.ptile:hover img { transform: scale(1.05); filter: saturate(1); }
+.ptile:focus-visible { outline: 3px solid var(--gold-leaf); outline-offset: 2px; }
+.ptile .tx { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; padding: 14px 16px; color: #f3e6c6; }
+.ptile .tx b { display: block; font-family: var(--display); font-size: 19px; letter-spacing: .04em; }
+.ptile.big .tx b { font-size: 30px; }
+.ptile .tx em { display: block; font-style: normal; color: #d9b96f; font-size: 14px; }
+.ptile .tx i { display: block; font-size: 14px; color: #cdbd9c; margin-top: 3px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .25s ease, opacity .25s ease; }
+.ptile:hover .tx i, .ptile:focus-visible .tx i, .ptile.big .tx i { max-height: 60px; opacity: 1; }
+.pnew { margin: 30px 0 0; display: grid; grid-template-columns: 1fr repeat(${Math.max(fresh.length, 1)}, auto); gap: 14px; background: #1c150e; color: #e8dbbd; border-radius: 4px; padding: 16px; }
+.pnew h2 { color: #d9b96f; }
+.pnew p { margin: 0 0 8px; font-size: 17px; }
+.pnew b { color: #f7ecd0; }
+.pnew .nt a { color: #d9b96f; }
+.nu { position: relative; width: 120px; height: 150px; overflow: hidden; border-radius: 3px; text-decoration: none; }
+.nu img { width: 100%; height: 100%; object-fit: cover; object-position: center 15%; }
+.nu span { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 6px; font-size: 13px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.85)); line-height: 1.15; }
+/* search results replace the body while a query is typed */
+#results { margin: 26px 0 8px; }
 .rgroup { margin-bottom: 16px; }
 .rgroup h3 { font-family: var(--display); font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line-dark); padding-bottom: 3px; margin: 0 0 7px; }
 .rgroup h3 span { color: var(--ink-soft); font-weight: 400; }
@@ -6711,32 +6718,58 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
 .rgroup a .rc { color: var(--ink-soft); font-size: 12.5px; font-style: italic; }
 .rgroup .rmore { color: var(--ink-soft); font-size: 13px; font-style: italic; }
 .nores { text-align: center; color: var(--ink-soft); font-style: italic; padding: 28px; }
-@media (max-width: 620px) { main { padding: 6px 10px 60px; } .psearch { flex-direction: column; } .psearch button { padding: 9px; } }
+@media (min-width: 901px) and (max-width: 1180px) {
+  .pbento { grid-template-columns: repeat(3, 1fr); }
+  .ptile.wide { grid-column: span 1; }
+}
+@media (max-width: 900px) {
+  .pstrip { grid-template-columns: repeat(5, 1fr); }
+  .pstrip img:nth-child(n+6) { display: none; }
+  .pbento { grid-template-columns: repeat(2, 1fr); }
+  .pnew { grid-template-columns: 1fr 1fr; }
+  .pnew .nt { grid-column: 1 / -1; }
+  .nu { width: auto; }
+}
+@media (max-width: 520px) {
+  .phero { min-height: 400px; }
+  .phin { padding-bottom: 32px; }
+  .pbento { grid-auto-rows: 150px; }
+  .ptile.big { grid-row: span 1; }
+  .psearch { flex-direction: column; }
+  .psearch button { padding: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pstrip img { animation: none; opacity: .9; }
+  .ptile img, .brow img { transition: none; }
+}
 </style>
 <link href="site.css" rel="stylesheet">
 </head>
 <body>
-<header>
-  <h1>AGO Compendium</h1>
-  <p class="sub">The complete field archive for Divide and Conquer: AGO</p>
-  <nav class="sitenav"><a href="index.html" class="active">Home</a><a href="units.html">Units</a><a href="rosters.html">Rosters</a><a href="factions.html">Factions</a><a href="buildings.html">Buildings &amp; Guilds</a><a href="characters.html">Characters</a><a href="regions.html">World</a><a href="annals.html">Annals</a><a href="mechanics.html">Mechanics</a><a href="changes.html">Changes</a><a href="about.html">About</a></nav>
-</header>
+${siteRail('index.html')}
 
 <main>
   <section class="phero">
-    <p class="tagline">A data field guide to every host, hold and chronicle of Middle-earth in the AGO mod.</p>
-    <p class="cred">Generated from the mod files &middot; Version <b>${ver}</b> &middot; Built <b>${generated}</b></p>
-    <form class="psearch" action="units.html" method="get" role="search">
-      <input type="search" name="q" placeholder="Search units, factions, buildings, traits, regions, events&hellip;" aria-label="Search the compendium" autocomplete="off">
-      <button type="submit">Search</button>
-    </form>
+    <div class="pstrip">${strip}</div>
+    <div class="phin">
+      <p class="k">Version ${ver} &middot; ${model.units.length} units &middot; ${model.factionPages.length} factions</p>
+      <h1>Muster the hosts<br>of Middle-earth.</h1>
+      <p class="s">The complete field archive for Divide and Conquer: AGO, generated from the mod files.</p>
+      <form class="psearch" action="units.html" method="get" role="search">
+        <input type="search" name="q" placeholder="Search units, factions, buildings, traits, regions, events&hellip;" aria-label="Search the compendium" autocomplete="off">
+        <button type="submit">Search</button>
+      </form>
+    </div>
   </section>
 
-  <div id="results" hidden></div>
-  <div class="pgrid">${cardHtml}</div>
-
-  ${d ? `<section class="pchanges"><h2>Latest update &mdash; ${d.from} to ${d.to}</h2>` +
-    `<p class="nums"><b>${d.changed.length}</b> units changed &middot; <b>${d.added.length}</b> added &middot; <b>${d.removed.length}</b> removed &mdash; <a href="changes.html">see the war report &rarr;</a></p></section>` : ''}
+  <div class="pwrap">
+    <div id="results" hidden></div>
+    <div class="pbody">
+      <section class="pbanners"><h2>Choose your banner <span>${model.factionPages.length} playable factions</span></h2><div class="brow">${banners}</div></section>
+      <section class="pbento" aria-label="Sections">${tiles}</section>
+      ${newHtml}
+    </div>
+  </div>
 </main>
 
 <footer>An independent data reference, generated from the AGO mod files &middot; <a class="x" href="about.html">about this site</a></footer>
@@ -6745,8 +6778,7 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
 (function () {
   var input = document.querySelector('.psearch input');
   var form = document.querySelector('.psearch');
-  var grid = document.querySelector('.pgrid');
-  var changes = document.querySelector('.pchanges');
+  var body = document.querySelector('.pbody');
   var results = document.getElementById('results');
   var INDEX = null, loading = false;
   var KORDER = ['Unit', 'Faction', 'Building', 'Trait', 'Retinue', 'Hero', 'Ability', 'Province', 'Event', 'Mechanics'];
@@ -6762,7 +6794,7 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
   }
   function run(raw) {
     var q = raw.trim().toLowerCase();
-    if (q.length < 2) { results.hidden = true; results.innerHTML = ''; grid.hidden = false; if (changes) changes.hidden = false; return; }
+    if (q.length < 2) { results.hidden = true; results.innerHTML = ''; body.hidden = false; return; }
     if (!INDEX) { load(function () { run(input.value); }); return; }
     var hits = [];
     for (var i = 0; i < INDEX.length; i++) {
@@ -6771,7 +6803,7 @@ main { max-width: 1000px; margin: 0 auto; padding: 6px 16px 64px; }
       hits.push([p === 0 ? 0 : (n.charAt(p - 1) === ' ' ? 1 : 2), e]);
     }
     hits.sort(function (a, b) { return a[0] - b[0] || a[1].t.length - b[1].t.length; });
-    grid.hidden = true; if (changes) changes.hidden = true; results.hidden = false;
+    body.hidden = true; results.hidden = false;
     if (!hits.length) { results.innerHTML = '<p class="nores">No matches for &ldquo;' + esc(raw.trim()) + '&rdquo;.</p>'; return; }
     var byk = {};
     for (var j = 0; j < hits.length; j++) { var x = hits[j][1]; (byk[x.k] = byk[x.k] || []).push(x); }
