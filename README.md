@@ -13,7 +13,9 @@ provinces, events, mechanics) — results grouped by kind, each linking to its
 entry; the index is a standalone `search-index.js` lazy-loaded on first
 focus (a script, not a fetch, so it works offline too). **units.html** is the unit compendium
 itself (every unit's names, descriptions and battle stats merged from the
-mod's data files, with table and war-card views). Companion
+mod's data files, with table and war-card views; clicking a war card opens a
+trimmed dossier with stat bars and a combat radar, with a link to the full
+table entry). Companion
 pages: **buildings.html** (every building chain and guild, with a settlement
 tech-tree view), **factions.html** (campaign overviews and questlines for all
 26 playable factions), **characters.html** (every visible character trait

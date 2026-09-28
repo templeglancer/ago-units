@@ -2800,6 +2800,67 @@ tr.unit.flash td { animation: rowflash 1.6s ease-out; }
 .warcard .wc-stats b { font-family: var(--display); font-weight: 600; font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--gold-deep); margin-right: 3px; }
 .warcard .wc-tags { margin-top: 8px; line-height: 1.9; }
 .warcard .wc-tags .badge { margin-left: 0; margin-right: 4px; }
+/* war-card dossier: a trimmed unit profile opened from a war card */
+#dossier { position: fixed; inset: 0; z-index: 150; display: grid; place-items: center; padding: 20px 64px; background: rgba(20,14,8,.62); animation: dosFade .15s ease; }
+#dossier[hidden] { display: none; }
+html.dos-open { overflow: hidden; }
+@keyframes dosFade { from { opacity: 0; } }
+@keyframes dosRise { from { opacity: 0; transform: translateY(12px); } }
+.dos-box { position: relative; width: min(1040px, 100%); display: grid; grid-template-columns: 290px minmax(0, 1fr); background: var(--panel); border: 1px solid var(--gold-deep); border-radius: 6px; box-shadow: 0 24px 60px rgba(0,0,0,.5); animation: dosRise .2s ease; }
+.dos-box:focus { outline: none; }
+.dos-pic { display: flex; align-items: center; justify-content: center; background: #1a130d; border-top: 5px solid; border-radius: 6px 0 0 6px; overflow: hidden; }
+.dos-pic img { display: block; width: 100%; height: 100%; min-height: 420px; object-fit: cover; object-position: center 15%; }
+.dos-phi { width: 80px; height: 80px; color: #6c5a42; }
+.dos-main { max-height: calc(100vh - 40px); overflow: auto; padding: 24px 30px 22px; }
+.dos-kick { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-family: var(--display); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.dos-ri { width: 14px; height: 14px; }
+.dos-main h2 { font-family: var(--display); font-size: 28px; line-height: 1.1; margin: 0 0 8px; color: var(--ink); }
+.dos-short { margin: 0 0 14px; font-style: italic; line-height: 1.45; color: var(--ink-soft); }
+.dos-battle { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; align-items: center; margin: 4px 0 2px; }
+.dos-battle h3 { margin: 0 0 10px; font-family: var(--display); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.dos-battle .radar-wrap { margin: -8px -6px -10px 0; }
+.dos-bars { display: grid; gap: 6px; }
+.dos-bar { display: grid; grid-template-columns: 62px 1fr 30px; align-items: center; gap: 8px; font-size: 13.5px; }
+.dos-bar .l { font-family: var(--display); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold-deep); }
+.dos-bar .t { height: 7px; overflow: hidden; border-radius: 4px; background: rgba(120,90,40,.14); }
+.dos-bar .t i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--gold-deep), var(--gold-leaf)); }
+.dos-bar b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dos-bar em { grid-column: 2 / -1; margin-top: -4px; font-size: 12px; color: var(--ink-soft); }
+.dos-facts { display: flex; flex-wrap: wrap; gap: 22px; margin: 14px 0 10px; }
+.dos-facts dt, .dos-where b { font-family: var(--display); font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--gold-deep); }
+.dos-facts dd { margin: 1px 0 0; font-size: 16px; }
+.dos-where { margin: 0 0 10px; font-size: 14.5px; }
+.dos-where b { margin-right: 6px; }
+.dos-tags { margin: 0 0 10px; line-height: 2; }
+.dos-tags .badge { margin: 0 4px 0 0; }
+.dos-chip { display: inline-block; margin: 0 4px 0 0; padding: 0 8px; border: 1px solid var(--line-dark); border-radius: 10px; font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); }
+.dos-main .patchline { margin: 0 0 12px; }
+.dos-act { display: flex; flex-wrap: wrap; gap: 10px; }
+.dos-act button { cursor: pointer; padding: 7px 12px; border: 1px solid var(--accent); border-radius: 3px; background: transparent; color: var(--accent); font-family: var(--display); font-size: 12px; letter-spacing: .05em; }
+.dos-act button:first-child { background: var(--accent); color: #f6eeda; }
+.dos-act button:focus-visible, .dos-nav:focus-visible, .dos-x:focus-visible { outline: 2px solid var(--gold-leaf); outline-offset: 2px; }
+.dos-x { position: absolute; z-index: 1; top: 8px; left: 10px; border: 0; background: none; font-size: 26px; line-height: 1; color: #f3e6c6; text-shadow: 0 1px 4px #000; cursor: pointer; }
+.dos-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(250,244,228,.14); color: #f3e6c6; font-size: 26px; line-height: 1; cursor: pointer; }
+.dos-nav:hover { background: rgba(250,244,228,.28); }
+.dos-nav.prev { left: -50px; }
+.dos-nav.next { right: -50px; }
+@media (max-width: 860px) {
+  .dos-battle { grid-template-columns: 1fr; }
+  .dos-battle .radar-wrap { max-width: 280px; margin: 0 auto; }
+}
+@media (max-width: 720px) {
+  #dossier { padding: 12px; }
+  .dos-box { grid-template-columns: 1fr; max-height: calc(100vh - 24px); overflow: auto; }
+  .dos-pic { border-radius: 6px 6px 0 0; }
+  .dos-pic img { min-height: 0; height: 220px; }
+  .dos-main { max-height: none; overflow: visible; padding: 18px 18px 20px; }
+  .dos-nav { top: 110px; background: rgba(20,14,8,.55); }
+  .dos-nav.prev { left: 6px; }
+  .dos-nav.next { right: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #dossier, .dos-box { animation: none; }
+}
 @media (max-width: 900px) {
   .hide-sm { display: none; }
   .detail-inner { flex-direction: column; }
@@ -2880,6 +2941,7 @@ ${siteRail('units.html')}
 </main>
 
 <div id="ref-modal" hidden><div class="ref-box" role="dialog"></div></div>
+<div id="dossier" hidden></div>
 
 <div id="cmp-bar" hidden>
   <span class="cmp-label">Compare</span>
@@ -3151,7 +3213,7 @@ function cardHtml(u, i) {
     (u.eop ? '<span class="badge eop" title="M2TWEOP addition">EOP</span>' : '') +
     (PATCH.units[u.slug] ? '<span class="badge upd" title="Changed in ' + PATCH.to + '">&#916;</span>' : '');
   const stat = (l, v) => (v === null || v === undefined || v === '') ? '' : '<span><b>' + l + '</b>' + v + '</span>';
-  return '<div class="warcard" data-id="' + u.id + '" style="--rc:' + c + ';animation-delay:' + Math.min(i * 18, 380) + 'ms">' +
+  return '<div class="warcard" tabindex="0" role="button" aria-haspopup="dialog" data-id="' + u.id + '" style="--rc:' + c + ';animation-delay:' + Math.min(i * 18, 380) + 'ms">' +
     '<div class="wc-strip"></div>' + img +
     '<div class="wc-body"><div class="wc-name"><span class="ri" style="color:' + c + '">' + roleSvg(r, '') + '</span><span>' + esc(u.name) + '</span></div>' +
     '<div class="wc-sub">' + esc(u.faction) + ' &middot; ' + typeLabel(u) + '</div>' +
@@ -3229,11 +3291,8 @@ document.getElementById('views').addEventListener('click', (e) => {
   for (const x of document.querySelectorAll('#views button')) x.classList.toggle('active', x === b);
   render();
 });
-// clicking a war card opens that unit in the table view
-document.getElementById('cards').addEventListener('click', (e) => {
-  const card = e.target.closest('.warcard');
-  if (!card) return;
-  const id = Number(card.dataset.id);
+// opens a unit's full entry in the table view
+function openInTable(id) {
   state.view = 'table';
   for (const x of document.querySelectorAll('#views button')) x.classList.toggle('active', x.dataset.v === 'table');
   state.open.add(id);
@@ -3241,6 +3300,116 @@ document.getElementById('cards').addEventListener('click', (e) => {
   render();
   const row = document.querySelector('tr.unit[data-id="' + id + '"]');
   if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
+}
+
+// ---- War-card dossier: clicking a war card opens a trimmed profile ----
+const dossier = document.getElementById('dossier');
+const DOS_MAX = Object.fromEntries(RADAR.axes.map(a => [a.k, a.max]));
+let dosId = null, dosReturn = false;
+
+function dosBars(u) {
+  const rows = [['Attack', u.atk, 'atk', ''], ['Charge', u.chg, 'chg', '']];
+  if (u.msl !== null) rows.push(['Missile', u.msl, 'msl', u.rng + ' range &middot; ' + u.ammo + ' ammo']);
+  rows.push(['Defence', u.def, 'def', u.armour + ' armour &middot; ' + u.skill + ' skill &middot; ' + u.shield + ' shield']);
+  rows.push(['Morale', u.morale, 'morale', u.lockMorale ? 'never routs' : '']);
+  return '<div class="dos-bars">' + rows.filter(r => r[1] !== null && r[1] !== undefined).map(([l, val, k, note]) =>
+    '<div class="dos-bar"><span class="l">' + l + '</span><span class="t"><i style="width:' + Math.min(100, Math.round(val / DOS_MAX[k] * 100)) + '%"></i></span>' +
+    '<b>' + val + '</b>' + (note ? '<em>' + note + '</em>' : '') + '</div>').join('') + '</div>';
+}
+function dosWhere(u) {
+  if (u.recruit.length) {
+    const seen = new Set();
+    const uniq = u.recruit.filter(r => !seen.has(r.b) && seen.add(r.b));
+    return uniq.slice(0, 2).map(r => esc(r.b) + ' <span class="dim">(tier ' + r.tier + ')</span>').join(', ') +
+      (uniq.length > 2 ? ' <span class="dim">+' + (uniq.length - 2) + ' more</span>' : '');
+  }
+  if (u.merc.length) {
+    const regs = u.merc.reduce((s, m) => s + m.regions.length, 0);
+    return 'Mercenary &middot; from ' + Math.min(...u.merc.map(m => m.cost)) + ' gold in ' + regs + (regs === 1 ? ' region' : ' regions');
+  }
+  if (u.attributes.includes('general_unit')) return 'Bodyguard &middot; arrives with new generals';
+  return '<span class="dim">Granted by events or campaign scripts</span>';
+}
+function dossierHtml(u) {
+  const r = roleOf(u), c = ROLECOL[r], pic = u.pic || u.card, pinned = pins.includes(u.id);
+  const traits = u.attributes.map(a => ATTR_NOTES[a]).filter(Boolean).slice(0, 4);
+  const tags = badges(u.meleeAttr) + (u.msl !== null ? badges(u.mslAttr) : '') +
+    (u.eop ? '<span class="badge eop" title="M2TWEOP addition">EOP</span>' : '') +
+    traits.map(t => '<span class="dos-chip">' + esc(t) + '</span>').join('');
+  return '<div class="dos-box" role="dialog" aria-modal="true" aria-labelledby="dos-title" tabindex="-1">' +
+    '<button class="dos-x" data-dos="close" aria-label="Close">&times;</button>' +
+    '<div class="dos-pic" style="border-top-color:' + c + '">' + (pic ? '<img alt="" src="' + pic + '">' : roleSvg(r, 'dos-phi')) + '</div>' +
+    '<div class="dos-main">' +
+    '<p class="dos-kick" style="color:' + c + '">' + roleSvg(r, 'dos-ri') + esc(u.faction) + ' &middot; ' + typeLabel(u) + '</p>' +
+    '<h2 id="dos-title">' + esc(u.name) + '</h2>' +
+    (u.short ? '<p class="dos-short">' + esc(u.short) + '</p>' : '') +
+    '<div class="dos-battle"><div><h3>In battle</h3>' + dosBars(u) + '</div>' + radarSvg([u], true) + '</div>' +
+    '<dl class="dos-facts"><div><dt>Soldiers</dt><dd>' + inGame(u.men) + (u.extras ? ' + ' + inGame(u.extras) : '') + '</dd></div>' +
+    '<div><dt>Cost</dt><dd>' + u.cost + ' <span class="dim">/ ' + u.upkeep + ' upkeep</span></dd></div>' +
+    '<div><dt>Training</dt><dd>' + u.turns + (u.turns === 1 ? ' turn' : ' turns') + '</dd></div></dl>' +
+    '<p class="dos-where"><b>Recruited at</b> ' + dosWhere(u) + '</p>' +
+    (tags ? '<div class="dos-tags">' + tags + '</div>' : '') +
+    patchBlock(u) +
+    '<div class="dos-act"><button data-dos="table">Full entry in table &rarr;</button>' +
+    '<button data-dos="pin" aria-pressed="' + pinned + '">' + (pinned ? '&#10003; In compare' : '+ Compare') + '</button></div>' +
+    '</div>' +
+    '<button class="dos-nav prev" data-dos="prev" aria-label="Previous unit">&lsaquo;</button>' +
+    '<button class="dos-nav next" data-dos="next" aria-label="Next unit">&rsaquo;</button>' +
+    '</div>';
+}
+function openDossier(id, fromCard) {
+  dosId = id;
+  if (fromCard) dosReturn = true;
+  dossier.innerHTML = dossierHtml(UNITS[id]);
+  dossier.hidden = false;
+  document.documentElement.classList.add('dos-open');
+  dossier.querySelector('.dos-box').focus();
+}
+function closeDossier() {
+  if (dossier.hidden) return;
+  dossier.hidden = true;
+  document.documentElement.classList.remove('dos-open');
+  // hand focus back to the card of the unit last shown
+  const card = dosReturn && document.querySelector('.warcard[data-id="' + dosId + '"]');
+  if (card) card.focus();
+  dosReturn = false;
+}
+function stepDossier(d) {
+  const ids = [...document.querySelectorAll('#cards .warcard')].map(c => Number(c.dataset.id));
+  const i = ids.indexOf(dosId);
+  if (i >= 0) openDossier(ids[(i + d + ids.length) % ids.length]);
+}
+document.getElementById('cards').addEventListener('click', (e) => {
+  const card = e.target.closest('.warcard');
+  if (card) openDossier(Number(card.dataset.id), true);
+});
+document.getElementById('cards').addEventListener('keydown', (e) => {
+  const card = e.target.closest('.warcard');
+  if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDossier(Number(card.dataset.id), true); }
+});
+dossier.addEventListener('click', (e) => {
+  if (e.target === dossier) { closeDossier(); return; }
+  const b = e.target.closest('[data-dos]');
+  if (!b) return;
+  const act = b.dataset.dos;
+  if (act === 'close') closeDossier();
+  else if (act === 'prev') stepDossier(-1);
+  else if (act === 'next') stepDossier(1);
+  else if (act === 'table') { const id = dosId; dosReturn = false; closeDossier(); openInTable(id); }
+  else if (act === 'pin') {
+    const i = pins.indexOf(dosId);
+    if (i >= 0) pins.splice(i, 1); else if (pins.length < 4) pins.push(dosId);
+    renderPins();
+    const on = pins.includes(dosId);
+    b.setAttribute('aria-pressed', on);
+    b.innerHTML = on ? '&#10003; In compare' : '+ Compare';
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (dossier.hidden) return;
+  if (e.key === 'Escape') closeDossier();
+  else if (e.key === 'ArrowLeft') stepDossier(-1);
+  else if (e.key === 'ArrowRight') stepDossier(1);
 });
 document.getElementById('cards').addEventListener('error', (e) => {
   if (e.target instanceof HTMLImageElement) { e.target.outerHTML = '<div class="wc-ph"></div>'; }
@@ -3290,7 +3459,7 @@ function radarVal(u, k) {
 }
 // an SVG spider chart overlaying the pinned units across six combat axes,
 // each scaled against the field's 95th-percentile so shapes are comparable
-function radarSvg(us) {
+function radarSvg(us, bare) {
   const ax = RADAR.axes, n = ax.length, cx = 165, cy = 158, R = 98;
   const ang = i => (-90 + i * (360 / n)) * Math.PI / 180;
   const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
@@ -3311,6 +3480,8 @@ function radarSvg(us) {
     const pts = ax.map((a, i) => pt(i, R * Math.min(1, radarVal(u, a.k) / a.max)).map(v => v.toFixed(1)).join(',')).join(' ');
     g += '<polygon points="' + pts + '" fill="' + c + '" fill-opacity="0.13" stroke="' + c + '" stroke-width="1.8" stroke-linejoin="round"/>';
   });
+  // bare: a single unit's profile with no legend or note (the war-card dossier)
+  if (bare) return '<div class="radar-wrap"><svg viewBox="0 0 330 300" width="330" height="300" role="img" aria-label="Combat profile radar">' + g + '</svg></div>';
   const legend = us.map((u, ui) => '<span class="rleg"><i style="background:' + RC[ui % RC.length] + '"></i>' + esc(u.name) + '</span>').join('');
   return '<div class="radar-wrap"><svg viewBox="0 0 330 300" width="330" height="300" role="img" aria-label="Combat profile radar comparison">' + g + '</svg><div class="radar-legend">' + legend + '</div><p class="radar-note">Each axis is scaled to the strongest units in the game, so the shape shows where a unit specialises.</p></div>';
 }
