@@ -6595,7 +6595,7 @@ const SITE_NAV = [
   ['about.html', 'About', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 8v8h2v-8zm0-4v2h2V6z'],
 ];
 const navIcon = (href) => (SITE_NAV.find((n) => n[0] === href) || [])[2] || '';
-const svgIcon = (d) => '<svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="' + d + '"/></svg>';
+const svgIcon = (d) => '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="' + d + '"/></svg>';
 
 function siteRail(active) {
   const ver = modVersion();
@@ -6861,7 +6861,11 @@ const withQuote = (html) => loreQuotes.length
   ? html.replace('</footer>', '<div id="lq" style="margin-top:7px"></div></footer>')
     .replace('</body>', QUOTE_SNIPPET + '\n</body>')
   : html;
-const writePage = (file, html) => fs.writeFileSync(file, withQuote(html), 'utf8');
+// site.css is cached by browsers for hours; a content hash in its URL makes
+// every change reach visitors on their next page load.
+const CSS_VER = require('crypto').createHash('sha1').update(fs.readFileSync(path.join(__dirname, 'site.css'))).digest('hex').slice(0, 10);
+const withCssVer = (html) => html.split('href="site.css"').join('href="site.css?v=' + CSS_VER + '"');
+const writePage = (file, html) => fs.writeFileSync(file, withCssVer(withQuote(html)), 'utf8');
 
 fs.writeFileSync(path.join(__dirname, 'search-index.js'), 'window.AGO_SEARCH=' + JSON.stringify(buildSearchIndex(model)) + ';', 'utf8');
 console.log(`Search index: ${buildSearchIndex(model).length} entries.`);
