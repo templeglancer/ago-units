@@ -2010,8 +2010,12 @@ function parseEopUnits() {
     const body = m[2];
     const filePath = (body.match(/filePath\s*=\s*"([^"]*)"/) || [])[1];
     if (!filePath) continue;
-    const file = path.join(EOP_SCRIPTS, 'Resources', filePath.replace(/^\//, ''));
+    let file = path.join(EOP_SCRIPTS, 'Resources', filePath.replace(/^\//, ''));
     if (!fs.existsSync(file)) continue;
+    // The author's temporary Dol Amroth buff edits a few of these files in
+    // place; the site shows the mod's own values, so prefer the parked original.
+    const orig = path.join(MOD_ROOT, '_dol_amroth_buff_backup', 'eop', path.basename(file));
+    if (fs.existsSync(orig)) file = orig;
     const parsed = parseEduText(fs.readFileSync(file, 'latin1'), 'EOP Additions');
     if (!parsed.length) continue;
     const u = parsed[0];
